@@ -285,7 +285,7 @@ void LLVMModuleSet::prePassSchedule()
             PB.registerLoopAnalyses(LAM);
             PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
             llvm::FunctionPassManager FPM;
-            // FPM.addPass(llvm::UnifyFunctionExitNodesPass());
+            FPM.addPass(llvm::UnifyFunctionExitNodesPass());
             FPM.run(fun, FAM);
 #endif
         }
