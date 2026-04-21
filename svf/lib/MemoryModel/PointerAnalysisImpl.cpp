@@ -308,6 +308,8 @@ void BVDataPTAImpl::readPtsResultFromFile(std::ifstream& F)
     {
         // Parse a single line in the form of "var -> { obj1 obj2 obj3 }"
         getline(F, line);
+        if (line.empty())
+            continue;
         if (line.at(0) == '[' || line == "---VERSIONED---") continue;
         if (line == "------")     break;
         size_t pos = line.find(delimiter1);
@@ -316,6 +318,8 @@ void BVDataPTAImpl::readPtsResultFromFile(std::ifstream& F)
 
         // var
         NodeID var = atoi(line.substr(0, pos).c_str());
+        if (!pag->hasGNode(var))
+            continue;
 
         // objs
         pos = pos + delimiter1.length();
@@ -331,9 +335,8 @@ void BVDataPTAImpl::readPtsResultFromFile(std::ifstream& F)
 
             istringstream ss(objs);
             NodeID obj;
-            while (ss.good())
+            while (ss >> obj)
             {
-                ss >> obj;
                 dstPts.set(obj);
             }
             // map the string pointer set to the parsed PointsTo set
@@ -360,7 +363,10 @@ void BVDataPTAImpl::readGepObjVarMapFromFile(std::ifstream& F)
         NodeID base;
         size_t offset;
         NodeID id;
-        ss >> base >> offset >>id;
+        if (!(ss >> base >> offset >>id))
+            continue;
+        if (!pag->hasGNode(base))
+            continue;
         SVFIR::NodeOffsetMap::const_iterator iter = gepObjVarMap.find(std::make_pair(base, offset));
         if (iter == gepObjVarMap.end())
         {
@@ -401,10 +407,18 @@ void BVDataPTAImpl::readAndSetObjFieldSensitivity(std::ifstream& F, const std::s
         istringstream ss(line);
         NodeID base;
         bool insensitive;
-        ss >> base >> insensitive;
+        if (!(ss >> base >> insensitive))
+            continue;
 
         if (insensitive)
-            setObjFieldInsensitive(base);
+        {
+            if (!pag->hasGNode(base))
+                continue;
+            const BaseObjVar* baseObj = pag->getBaseObject(base);
+            if (!baseObj)
+                continue;
+            const_cast<BaseObjVar*>(baseObj)->setFieldInsensitive();
+        }
     }
 
 }
