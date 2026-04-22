@@ -122,6 +122,10 @@ public:
     static void releaseSVFIR()
     {
         pag = nullptr;
+        // SVFIR construction and the symbol table share the process-global
+        // NodeID allocator. Reset it when the singleton PAG is released so a
+        // subsequent in-process analysis run starts from a clean symbol space.
+        NodeIDAllocator::unset();
     }
     //@}
     /// Return memToFieldsMap
