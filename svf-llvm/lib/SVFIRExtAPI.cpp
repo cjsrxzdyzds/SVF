@@ -218,8 +218,8 @@ void SVFIRBuilder::addComplexConsForExt(Value *D, Value *S, const Value* szValue
 
         const DataLayout& dl = llvmModuleSet()->getMainLLVMModule()->getDataLayout();
         APOffset copyBytes = std::min<APOffset>(
-            static_cast<APOffset>(dl.getTypeAllocSize(const_cast<Type*>(dstLayoutType))),
-            static_cast<APOffset>(dl.getTypeAllocSize(const_cast<Type*>(srcLayoutType))));
+                                 static_cast<APOffset>(dl.getTypeAllocSize(const_cast<Type*>(dstLayoutType))),
+                                 static_cast<APOffset>(dl.getTypeAllocSize(const_cast<Type*>(srcLayoutType))));
         if (szValue && SVFUtil::isa<ConstantInt>(szValue))
         {
             auto szIntVal = LLVMUtil::getIntegerValue(SVFUtil::cast<ConstantInt>(szValue));

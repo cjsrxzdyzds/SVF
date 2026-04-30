@@ -1609,13 +1609,13 @@ const Value* SVFIRBuilder::getBaseValueForExtArg(const Value* V)
 
         DataLayout* dataLayout = getDataLayout(llvmModuleSet()->getMainLLVMModule());
         const StructLayout* layout =
-            dataLayout->getStructLayout(const_cast<StructType*>(structType));
+        dataLayout->getStructLayout(const_cast<StructType*>(structType));
         for (u32_t fieldIdx = 0; fieldIdx < initializer->getNumOperands(); ++fieldIdx)
         {
             if (layout->getElementOffset(fieldIdx) != static_cast<uint64_t>(byteOffset))
                 continue;
             if (auto* ptrValue =
-                        SVFUtil::dyn_cast<llvm::GlobalVariable>(initializer->getOperand(fieldIdx)))
+                    SVFUtil::dyn_cast<llvm::GlobalVariable>(initializer->getOperand(fieldIdx)))
                 return ptrValue;
             return nullptr;
         }
