@@ -99,6 +99,13 @@ public:
     static Option<bool> HandBlackHole;
     static const Option<bool> FirstFieldEqBase;
 
+    // Admit INTTOPTR/PTRTOINT copies into the constraint graph and let the
+    // load/store rules fire on non-pointer-typed operands (ConsG.cpp,
+    // Andersen.cpp). Attribution experiment: recovers value flow through
+    // int<->ptr type-puns (e.g. a heap pointer stored as i64 via ptrtoint and
+    // reloaded as ptr) that stock SVF drops at graph construction.
+    static Option<bool> AdmitI2PCopy;
+
     // SVFG optimizer (SVFGOPT.cpp)
     static const Option<bool> ContextInsensitive;
     static const Option<bool> KeepAOFI;

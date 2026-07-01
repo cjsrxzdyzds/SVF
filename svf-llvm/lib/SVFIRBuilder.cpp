@@ -1122,6 +1122,21 @@ void SVFIRBuilder::visitStoreInst(StoreInst &inst)
 
     addStoreEdge(src, dst);
 
+    // -admit-i2p-copy: a pointer punned into integer memory (`store i64
+    // (ptrtoint P), ptr X`) never enters the PTA statement subset -- both
+    // stmt endpoints must be pointer-typed (SVFIR::addToStmt2TypeMap) -- so
+    // the write half of the pun is severed before any solver runs. Model the
+    // provenance fact directly: shadow-store P itself to the same location.
+    // Pointer-typed end to end, so it needs no downstream special cases.
+    if (Options::AdmitI2PCopy())
+    {
+        if (const auto* p2i =
+                SVFUtil::dyn_cast<llvm::PtrToIntInst>(inst.getValueOperand()))
+        {
+            NodeID psrc = getValueNode(p2i->getPointerOperand());
+            addStoreEdge(psrc, dst);
+        }
+    }
 }
 
 /*!

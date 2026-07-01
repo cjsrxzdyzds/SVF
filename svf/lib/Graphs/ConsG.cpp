@@ -60,7 +60,13 @@ void ConstraintGraph::buildCG()
                 copys.end(); iter != eiter; ++iter)
     {
         const CopyStmt* edge = SVFUtil::cast<CopyStmt>(*iter);
-        if(edge->isBitCast() || edge->isValueCopy())
+        // -admit-i2p-copy: also admit INTTOPTR/PTRTOINT copies so points-to
+        // survives int<->ptr round-trips (incl. through memory type-puns via
+        // the relaxed load/store rules in Andersen.cpp). Stock SVF drops them
+        // here, which severs provenance BEFORE the solver ever runs.
+        if(edge->isBitCast() || edge->isValueCopy()
+                || (Options::AdmitI2PCopy()
+                    && (edge->isInt2Ptr() || edge->isPtr2Int())))
             addCopyCGEdge(edge->getRHSVarID(),edge->getLHSVarID());
     }
 

@@ -167,6 +167,13 @@ Option<bool> Options::HandBlackHole(
     false
 );
 
+Option<bool> Options::AdmitI2PCopy(
+    "admit-i2p-copy",
+    "Admit inttoptr/ptrtoint copies as constraint edges and relax the "
+    "pointer-type guards on load/store rules (int<->ptr provenance experiment)",
+    false
+);
+
 const Option<bool> Options::FirstFieldEqBase(
     "ff-eq-base",
     "Treat base objects as their first fields",
