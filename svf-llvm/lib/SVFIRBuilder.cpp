@@ -48,6 +48,12 @@ using namespace SVF;
 using namespace SVFUtil;
 using namespace LLVMUtil;
 
+// UNSAFE-SVF BEGIN (-model-extractvalue)
+// Mechanism counters for visitExtractValueInst modeling; reset per build().
+static u32_t evModeled = 0;
+static u32_t evBailed = 0;
+// UNSAFE-SVF END
+
 
 /*!
  * Start building SVFIR here
@@ -68,6 +74,10 @@ SVFIR* SVFIRBuilder::build()
     // If the SVFIR has been built before, then we return the unique SVFIR of the program
     if(pag->getNodeNumAfterPAGBuild() > 1)
         return pag;
+
+    // UNSAFE-SVF BEGIN (-model-extractvalue counters, see visitExtractValueInst)
+    evModeled = evBailed = 0;
+    // UNSAFE-SVF END
 
 
     createFunObjVars();
@@ -155,6 +165,13 @@ SVFIR* SVFIRBuilder::build()
     }
 
     sanityCheck();
+
+    // UNSAFE-SVF BEGIN (-model-extractvalue)
+    if (Options::ModelExtractValue())
+        SVFUtil::outs() << "[SVFIRBuilder] -model-extractvalue: modeled "
+                        << evModeled << " ptr-yielding extractvalue, bailed "
+                        << evBailed << " (blackhole)\n";
+    // UNSAFE-SVF END
 
     pag->initialiseCandidatePointers();
 
@@ -1350,9 +1367,145 @@ void SVFIRBuilder::visitReturnInst(ReturnInst &inst)
  * however we can not create %call34 as an memory object, as it is register value.
  * Is that necessary treat extract value as getelementptr instruction later to get more precise results?
  */
+bool SVFIRBuilder::resolveAggSources(
+    const Value* agg, llvm::ArrayRef<unsigned> indices,
+    const llvm::CallBase* via,
+    std::set<std::pair<const Value*, std::vector<unsigned>>>& visited,
+    std::vector<std::pair<const Value*, const llvm::CallBase*>>& srcs,
+    unsigned depth)
+{
+    // Depth cap guards against pathological chains; phi/recursive-call cycles
+    // are broken by `visited` (revisit contributes nothing new — the first
+    // visit collects all leaves reachable from that (value, field) pair).
+    if (depth > 32)
+        return false;
+    if (!visited
+             .insert({agg, std::vector<unsigned>(indices.begin(), indices.end())})
+             .second)
+        return true;
+
+    if (const auto* iv = SVFUtil::dyn_cast<llvm::InsertValueInst>(agg))
+    {
+        llvm::ArrayRef<unsigned> ivIdx = iv->getIndices();
+        unsigned n = std::min(ivIdx.size(), indices.size());
+        if (!std::equal(ivIdx.begin(), ivIdx.begin() + n, indices.begin()))
+            // insert into a disjoint field: our field comes from the base agg
+            return resolveAggSources(iv->getAggregateOperand(), indices, via,
+                                     visited, srcs, depth + 1);
+        if (ivIdx.size() == indices.size())
+        {
+            srcs.push_back({iv->getInsertedValueOperand(), via});
+            return true;
+        }
+        if (ivIdx.size() < indices.size())
+            // inserted a sub-aggregate that contains our field
+            return resolveAggSources(iv->getInsertedValueOperand(),
+                                     indices.drop_front(ivIdx.size()), via,
+                                     visited, srcs, depth + 1);
+        // insert wrote deeper than our (scalar) field — malformed for ptr, bail
+        return false;
+    }
+    if (const auto* ev = SVFUtil::dyn_cast<llvm::ExtractValueInst>(agg))
+    {
+        std::vector<unsigned> concat(ev->getIndices().begin(),
+                                     ev->getIndices().end());
+        concat.insert(concat.end(), indices.begin(), indices.end());
+        return resolveAggSources(ev->getAggregateOperand(), concat, via,
+                                 visited, srcs, depth + 1);
+    }
+    if (const auto* phi = SVFUtil::dyn_cast<llvm::PHINode>(agg))
+    {
+        for (const Value* in : phi->incoming_values())
+            if (!resolveAggSources(in, indices, via, visited, srcs, depth + 1))
+                return false;
+        return true;
+    }
+    if (const auto* sel = SVFUtil::dyn_cast<llvm::SelectInst>(agg))
+    {
+        return resolveAggSources(sel->getTrueValue(), indices, via, visited,
+                                 srcs, depth + 1) &&
+               resolveAggSources(sel->getFalseValue(), indices, via, visited,
+                                 srcs, depth + 1);
+    }
+    if (const auto* fr = SVFUtil::dyn_cast<llvm::FreezeInst>(agg))
+        return resolveAggSources(fr->getOperand(0), indices, via, visited,
+                                 srcs, depth + 1);
+    if (const auto* cb = SVFUtil::dyn_cast<llvm::CallBase>(agg))
+    {
+        const Function* callee = cb->getCalledFunction();
+        if (!callee || callee->isDeclaration() || callee->isIntrinsic())
+            return false;
+        // Leaves below cross this call boundary; keep the OUTERMOST callsite
+        // (the one in the extractvalue's own function) as the RetPE anchor.
+        const llvm::CallBase* boundary = via ? via : cb;
+        for (const BasicBlock& bb : *callee)
+            if (const auto* ret =
+                    SVFUtil::dyn_cast<llvm::ReturnInst>(bb.getTerminator()))
+                if (const Value* rv = ret->getReturnValue())
+                    if (!resolveAggSources(rv, indices, boundary, visited,
+                                           srcs, depth + 1))
+                        return false;
+        return true;
+    }
+    // undef/poison field contributes no pointer; a constant-aggregate null
+    // field likewise. Non-null constant fields (globals) are left to bail —
+    // their PAG node may not exist and the class is empty in Rust IR here.
+    if (SVFUtil::isa<llvm::UndefValue>(agg))
+        return true;
+    if (const auto* c = SVFUtil::dyn_cast<llvm::Constant>(agg))
+    {
+        const llvm::Constant* cur = c;
+        for (unsigned i : indices)
+        {
+            cur = cur->getAggregateElement(i);
+            if (!cur)
+                return false;
+        }
+        return cur->isNullValue() || SVFUtil::isa<llvm::UndefValue>(cur);
+    }
+    // load / cmpxchg / atomicrmw / landingpad / argument / inline asm: bail
+    return false;
+}
+
 void SVFIRBuilder::visitExtractValueInst(ExtractValueInst  &inst)
 {
     NodeID dst = getValueNode(&inst);
+    // UNSAFE-SVF BEGIN (-model-extractvalue)
+    // Stock SVF kills aggregate-return provenance here (result -> blackhole,
+    // upstream TODO above). For pointer-yielding extracts, trace the concrete
+    // field source: same-function leaves get a plain COPYVAL PAG edge; leaves
+    // crossing a call boundary have NO legal PAG representation (cross-
+    // function CopyStmts assert in setCurrentBBAndValueForPAGEdge, and each
+    // return CFG edge admits exactly one RetPE — already taken by
+    // handleDirectCall), so they are recorded on the SVFIR and injected as
+    // copy edges when ConstraintGraph::buildCG runs — the same lowering ConsG
+    // applies to RetPE. Empty `srcs` with success means the field is provably
+    // undef/null — more precise than blackhole.
+    if (Options::ModelExtractValue() && inst.getType()->isPointerTy())
+    {
+        std::set<std::pair<const Value*, std::vector<unsigned>>> visited;
+        std::vector<std::pair<const Value*, const llvm::CallBase*>> srcs;
+        if (resolveAggSources(inst.getAggregateOperand(), inst.getIndices(),
+                              nullptr, visited, srcs, 0))
+        {
+            for (const auto& [s, via] : srcs)
+            {
+                NodeID src = getValueNode(s);
+                if (!via)
+                    addCopyEdge(src, dst, CopyStmt::COPYVAL);
+                else
+                    pag->addExtraAggCopyPair(src, dst);
+            }
+            ++evModeled;
+            return;
+        }
+        ++evBailed;
+        // bail attribution (experiment diagnostics)
+        SVFUtil::outs() << "[model-extractvalue] BAIL in "
+                        << inst.getFunction()->getName().str() << ": "
+                        << LLVMUtil::dumpValue(&inst) << "\n";
+    }
+    // UNSAFE-SVF END
     addBlackHoleAddrEdge(dst);
 }
 

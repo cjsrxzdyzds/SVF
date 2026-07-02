@@ -106,6 +106,14 @@ public:
     // reloaded as ptr) that stock SVF drops at graph construction.
     static Option<bool> AdmitI2PCopy;
 
+    // Model pointer-yielding extractvalue precisely instead of pointing the
+    // result at blackhole (SVFIRBuilder.cpp visitExtractValueInst). Traces the
+    // concrete field source through insertvalue/ret/phi/select chains — incl.
+    // across direct calls returning aggregates (Rust (ptr,len) pairs, niche
+    // Results, btree handles) — and adds plain COPYVAL edges. Attribution
+    // experiment for the aggregate-return FN class.
+    static Option<bool> ModelExtractValue;
+
     // SVFG optimizer (SVFGOPT.cpp)
     static const Option<bool> ContextInsensitive;
     static const Option<bool> KeepAOFI;

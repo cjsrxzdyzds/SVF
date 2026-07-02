@@ -70,6 +70,14 @@ void ConstraintGraph::buildCG()
             addCopyCGEdge(edge->getRHSVarID(),edge->getLHSVarID());
     }
 
+    // -model-extractvalue: cross-function aggregate-field copies (callee
+    // ret-chain leaf -> extractvalue result) recorded by SVFIRBuilder; they
+    // have no PAG statement form, so inject them here — the same lowering
+    // RetPE receives below.
+    if (Options::ModelExtractValue())
+        for (const auto& [src, dst] : pag->getExtraAggCopyPairs())
+            addCopyCGEdge(src, dst);
+
     SVFStmt::SVFStmtSetTy& phis = getPAGEdgeSet(SVFStmt::Phi);
     for (SVFStmt::SVFStmtSetTy::iterator iter = phis.begin(), eiter =
                 phis.end(); iter != eiter; ++iter)

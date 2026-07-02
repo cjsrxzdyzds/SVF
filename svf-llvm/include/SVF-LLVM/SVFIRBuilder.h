@@ -223,6 +223,20 @@ protected:
     /// Process constant expression
     void processCE(const Value* val);
 
+    /// Trace the concrete value(s) feeding field `indices` of aggregate `agg`
+    /// through insertvalue/ret/phi/select/freeze chains (across direct calls).
+    /// Appends (leaf, boundary-callsite) pairs to `srcs` — the callsite is the
+    /// outermost call the leaf's value crosses to reach the current function
+    /// (nullptr for same-function leaves). Returns false if any contributing
+    /// path is unresolvable (caller falls back to blackhole).
+    /// Only used when Options::ModelExtractValue is on.
+    bool resolveAggSources(
+        const Value* agg, llvm::ArrayRef<unsigned> indices,
+        const llvm::CallBase* via,
+        std::set<std::pair<const Value*, std::vector<unsigned>>>& visited,
+        std::vector<std::pair<const Value*, const llvm::CallBase*>>& srcs,
+        unsigned depth);
+
     /// Infer field index from byteoffset.
     u32_t inferFieldIdxFromByteOffset(const llvm::GEPOperator* gepOp, DataLayout *dl, AccessPath& ap, APOffset idx);
 

@@ -174,6 +174,14 @@ Option<bool> Options::AdmitI2PCopy(
     false
 );
 
+Option<bool> Options::ModelExtractValue(
+    "model-extractvalue",
+    "Model pointer-yielding extractvalue via per-field value copies traced "
+    "through insertvalue/ret chains instead of blackhole (aggregate-return "
+    "provenance experiment)",
+    false
+);
+
 const Option<bool> Options::FirstFieldEqBase(
     "ff-eq-base",
     "Treat base objects as their first fields",
