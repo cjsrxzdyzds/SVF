@@ -30,6 +30,7 @@
 
 
 #include "MemoryModel/PointerAnalysisImpl.h"
+#include "WPA/NoAliasChecker.h"
 #include "Util/Options.h"
 #include <fstream>
 #include <sstream>
@@ -84,15 +85,21 @@ BVDataPTAImpl::BVDataPTAImpl(SVFIR* p, PointerAnalysis::PTATY type, bool alias_c
         if (Options::ptDataBacking() == PTBackingType::Mutable) ptD = std::make_unique<MutVersionedPTDataTy>(false);
         else if (Options::ptDataBacking() == PTBackingType::Persistent) ptD = std::make_unique<PersVersionedPTDataTy>(getPtCache(), false);
         else assert(false && "BVDataPTAImpl::BVDataPTAImpl: unexpected points-to backing type!");
-    }
-    else assert(false && "no points-to data available");
+    }    else assert(false && "no points-to data available");
 
     ptaImplTy = BVDataImpl;
 }
 
+BVDataPTAImpl::~BVDataPTAImpl() = default;
+
 void BVDataPTAImpl::finalize()
 {
-    normalizePointsTo();
+    // BUGFIX: Only run normalization for offline tools (built from file).
+    // In-process LTO (built from memory) has transient node states that cause crashes during cleanup.
+    if (pag->isBuiltFromFile())
+        normalizePointsTo();
+    
+    // Print statistics (required by CI tests)
     PointerAnalysis::finalize();
 
     if (Options::ptDataBacking() == PTBackingType::Persistent && print_stat)
@@ -124,7 +131,6 @@ void BVDataPTAImpl::finalize()
         SVFUtil::outs() << "#######################################################" << std::endl;
         SVFUtil::outs().flush();
     }
-
 }
 
 /*!
@@ -618,7 +624,16 @@ void BVDataPTAImpl::normalizePointsTo()
  */
 AliasResult BVDataPTAImpl::alias(NodeID node1, NodeID node2)
 {
-    return alias(getPts(node1),getPts(node2));
+    AliasResult res = alias(getPts(node1),getPts(node2));
+    if (res == AliasResult::NoAlias) return AliasResult::NoAlias;
+
+    // Utilize NoAlias attributes
+    if (noAliasChecker && noAliasChecker->check(node1, node2) == AliasResult::NoAlias)
+    {
+        return AliasResult::NoAlias;
+    }
+
+    return res;
 }
 
 /*!

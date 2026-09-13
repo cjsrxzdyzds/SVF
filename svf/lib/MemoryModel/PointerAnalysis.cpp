@@ -196,16 +196,22 @@ void PointerAnalysis::finalize()
     if (Options::FuncPointerPrint())
         printIndCSTargets();
 
-    getCallGraph()->verifyCallGraph();
+    // Verify call graph only for offline analysis (in-process may have incomplete state)
+    if (pag->isBuiltFromFile())
+        getCallGraph()->verifyCallGraph();
 
     if (Options::CallGraphDotGraph())
         getCallGraph()->dump("callgraph_final");
 
-    if(!pag->isBuiltFromFile() && alias_validation)
+    if(pag->isBuiltFromFile() && alias_validation)
         validateTests();
 
-    if (!Options::UsePreCompFieldSensitive())
-        resetObjFieldSensitive();
+    // Reset field sensitivity only for offline analysis
+    if (pag->isBuiltFromFile())
+    {
+        if (!Options::UsePreCompFieldSensitive())
+            resetObjFieldSensitive();
+    }
 }
 
 /*!

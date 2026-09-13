@@ -721,6 +721,20 @@ bool LLVMUtil::isStackObj(const Value* val)
     return false;
 }
 
+bool LLVMUtil::isUnsafeInst(const Instruction* inst)
+{
+    return inst->getMetadata("unsafe_inst") != nullptr;
+}
+
+bool LLVMUtil::isNoAlias(const Value* val)
+{
+    if (const Argument* arg = SVFUtil::dyn_cast<Argument>(val))
+    {
+        return arg->hasNoAliasAttr();
+    }
+    return false;
+}
+
 bool LLVMUtil::isNonInstricCallSite(const Instruction* inst)
 {
     bool res = false;
