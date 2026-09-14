@@ -25,7 +25,6 @@
 //
 #include "MemoryModel/PointerAnalysisImpl.h"
 #include "Graphs/SVFG.h"
-#include "Util/Options.h"
 #include "CFL/CFLSVFGBuilder.h"
 
 
@@ -76,7 +75,7 @@ void CFLSVFGBuilder::rmIncomingEdgeForSUStore(BVDataPTAImpl* pta)
 
         if(const StoreSVFGNode* stmtNode = SVFUtil::dyn_cast<StoreSVFGNode>(node))
         {
-            if(SVFUtil::isa<StoreStmt>(stmtNode->getPAGEdge()))
+            if(SVFUtil::isa<StoreStmt>(stmtNode->getSVFStmt()))
             {
                 NodeID singleton;
                 if(isStrongUpdate(node, singleton, pta))

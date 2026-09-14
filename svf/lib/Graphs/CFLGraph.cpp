@@ -28,8 +28,8 @@
  *      Author: Yulei Sui
  */
 
-#include "Util/Options.h"
 #include "Graphs/CFLGraph.h"
+#include "Graphs/GraphPrinter.h"
 #include "Util/SVFUtil.h"
 
 using namespace SVF;
@@ -131,11 +131,11 @@ struct DOTGraphTraits<CFLGraph*> : public DefaultDOTGraphTraits
         }
         else if (edge->getEdgeKindWithMask() == ConstraintEdge::NormalGep)
         {
-            rawstr << "color=purple,label=" << '"' << "Gep_" << edge->getEdgeAttri() << '"';
+            rawstr << "color=\"purple:purple\",label=" << '"' << "Gep_" << edge->getEdgeAttri() << '"';
         }
         else if (edge->getEdgeKindWithMask() == ConstraintEdge::VariantGep)
         {
-            rawstr << "color=purple,label=" << '"' << "VGep" << '"';
+            rawstr << "color=\"purple:purple\",label=" << '"' << "VGep" << '"';
         }
         else if (edge->getEdgeKind() == ConstraintEdge::Store)
         {

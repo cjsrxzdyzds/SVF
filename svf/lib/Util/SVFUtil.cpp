@@ -27,10 +27,14 @@
  *      Author: Yulei Sui
  */
 
+#include <unistd.h>
+#include <signal.h>
+
 #include "Util/Options.h"
 #include "Util/SVFUtil.h"
 #include "MemoryModel/PointsTo.h"
 #include "Graphs/CallGraph.h"
+#include "SVFIR/SVFIR.h"
 #include "SVFIR/SVFVariables.h"
 
 #include <sys/resource.h>		/// increase stack size
@@ -441,5 +445,6 @@ bool SVFUtil::isExtCall(const FunObjVar* fun)
 
 bool SVFUtil::isProgEntryFunction(const FunObjVar* funObjVar)
 {
-    return funObjVar && funObjVar->getName() == "main";
+    const char* main_name=Options::SVFMain() ? "svf.main" : "main";
+    return funObjVar && funObjVar->getName() == main_name;
 }

@@ -4,19 +4,20 @@
 #include "Util/CommandLine.h"
 #include "FastCluster/fastcluster.h"
 #include "Util/ExtAPI.h"
+#include "MemoryModel/PTATY.h"
 #include "MSSA/MemSSA.h"
 #include "WPA/WPAPass.h"
 #include "AE/Svfexe/AbstractInterpretation.h"
 
 namespace SVF
 {
-const OptionMap<enum PTAStat::ClockType> Options::ClockType(
+const OptionMap<enum SVFStat::ClockType> Options::ClockType(
     "clock-type",
     "how time should be measured",
-    PTAStat::ClockType::CPU,
+    SVFStat::ClockType::CPU,
 {
-    {PTAStat::ClockType::Wall, "wall", "use wall time"},
-    {PTAStat::ClockType::CPU, "cpu", "use CPU time"},
+    {SVFStat::ClockType::Wall, "wall", "use wall time"},
+    {SVFStat::ClockType::CPU, "cpu", "use CPU time"},
 }
 );
 
@@ -44,13 +45,13 @@ const Option<u32_t> Options::MaxFieldLimit(
     512
 );
 
-const OptionMap<BVDataPTAImpl::PTBackingType> Options::ptDataBacking(
+const OptionMap<PTBackingType> Options::ptDataBacking(
     "ptd",
     "Overarching points-to data structure",
-    BVDataPTAImpl::PTBackingType::Persistent,
+    PTBackingType::Persistent,
 {
-    {BVDataPTAImpl::PTBackingType::Mutable, "mutable", "points-to set per pointer"},
-    {BVDataPTAImpl::PTBackingType::Persistent, "persistent", "points-to set ID per pointer, operations hash-consed"},
+    {PTBackingType::Mutable, "mutable", "points-to set per pointer"},
+    {PTBackingType::Persistent, "persistent", "points-to set ID per pointer, operations hash-consed"},
 }
 );
 
@@ -86,7 +87,7 @@ const Option<u32_t> Options::MaxPathLen(
     100000
 );
 
-const Option<u32_t> Options::MaxContextLen(
+Option<u32_t> Options::MaxContextLen(
     "max-cxt",
     "Maximum context limit for DDA",
     3
@@ -136,11 +137,11 @@ const Option<bool> Options::WPANum(
 
 /// register this into alias analysis group
 //static RegisterAnalysisGroup<AliasAnalysis> AA_GROUP(DDAPA);
-OptionMultiple<PointerAnalysis::PTATY> Options::DDASelected(
+OptionMultiple<PTATY> Options::DDASelected(
     "Select pointer analysis",
 {
-    {PointerAnalysis::FlowS_DDA, "dfs", "Demand-driven flow sensitive analysis"},
-    {PointerAnalysis::Cxt_DDA, "cxt", "Demand-driven context- flow- sensitive analysis"},
+    {PTATY::FlowS_DDA, "dfs", "Demand-driven flow sensitive analysis"},
+    {PTATY::Cxt_DDA, "cxt", "Demand-driven context- flow- sensitive analysis"},
 }
 );
 
@@ -466,7 +467,7 @@ const Option<std::string> Options::ReadSVFG(
 
 
 const Option<bool> Options::IntraLock(
-    "intra-lock-td-edge",
+    "mta-intra-lock-td-edge",
     "Use simple intra-procedural lock for adding SVFG edges",
     true
 );
@@ -474,7 +475,7 @@ const Option<bool> Options::IntraLock(
 
 // LockAnalysis.cpp
 const Option<bool> Options::PrintLockSpan(
-    "print-lock",
+    "mta-print-lock",
     "Print Thread Interleaving Results",
     false
 );
@@ -482,29 +483,21 @@ const Option<bool> Options::PrintLockSpan(
 
 // MHP.cpp
 const Option<bool> Options::PrintInterLev(
-    "print-interlev",
+    "mta-print-interlev",
     "Print Thread Interleaving Results",
     false
 );
 
 const Option<bool> Options::DoLockAnalysis(
-    "lock-analysis",
+    "mta-lock-analysis",
     "Run Lock Analysis",
     true
 );
 
 
-// MTAStat.cpp
-const Option<bool> Options::AllPairMHP(
-    "all-pair-mhp",
-    "All pair MHP computation",
-    false
-);
-
-
 // TCT.cpp
 const Option<bool> Options::TCTDotGraph(
-    "dump-tct",
+    "mta-dump-tct",
     "Dump dot graph of Call Graph",
     false
 );
@@ -540,14 +533,6 @@ const Option<bool> Options::DumpCHA(
 );
 
 
-// DCHG.cpp
-const Option<bool> Options::PrintDCHG(
-    "print-dchg",
-    "print the DCHG if debug information is available",
-    false
-);
-
-
 // LLVMModule.cpp
 const Option<std::string> Options::Graphtxt(
     "graph-txt",
@@ -555,7 +540,7 @@ const Option<std::string> Options::Graphtxt(
     ""
 );
 
-const Option<bool> Options::SVFMain(
+Option<bool> Options::SVFMain(
     "svf-main",
     "add svf.main()",
     false
@@ -700,18 +685,18 @@ const Option<bool> Options::PrintAliases(
     false
 );
 
-OptionMultiple<PointerAnalysis::PTATY> Options::PASelected(
+OptionMultiple<PTATY> Options::PASelected(
     "Select pointer analysis",
 {
-    {PointerAnalysis::Andersen_WPA, "nander", "Standard inclusion-based analysis"},
-    {PointerAnalysis::AndersenSCD_WPA, "sander", "Selective cycle detection inclusion-based analysis"},
-    {PointerAnalysis::AndersenSFR_WPA, "sfrander", "Stride-based field representation inclusion-based analysis"},
-    {PointerAnalysis::AndersenWaveDiff_WPA, "ander", "Diff wave propagation inclusion-based analysis"},
-    {PointerAnalysis::Steensgaard_WPA, "steens", "Steensgaard's pointer analysis"},
+    {PTATY::Andersen_WPA, "nander", "Standard inclusion-based analysis"},
+    {PTATY::AndersenSCD_WPA, "sander", "Selective cycle detection inclusion-based analysis"},
+    {PTATY::AndersenSFR_WPA, "sfrander", "Stride-based field representation inclusion-based analysis"},
+    {PTATY::AndersenWaveDiff_WPA, "ander", "Diff wave propagation inclusion-based analysis"},
+    {PTATY::Steensgaard_WPA, "steens", "Steensgaard's pointer analysis"},
     // Disabled till further work is done.
-    {PointerAnalysis::FSSPARSE_WPA, "fspta", "Sparse flow sensitive pointer analysis"},
-    {PointerAnalysis::VFS_WPA, "vfspta", "Versioned sparse flow-sensitive points-to analysis"},
-    {PointerAnalysis::TypeCPP_WPA, "type", "Type-based fast analysis for Callgraph, SVFIR and CHA"},
+    {PTATY::FSSPARSE_WPA, "fspta", "Sparse flow sensitive pointer analysis"},
+    {PTATY::VFS_WPA, "vfspta", "Versioned sparse flow-sensitive points-to analysis"},
+    {PTATY::TypeCPP_WPA, "type", "Type-based fast analysis for Callgraph, SVFIR and CHA"},
 }
 );
 
@@ -796,6 +781,38 @@ const Option<u32_t> Options::LoopBound(
     1
 );
 
+const OptionMap<u32_t> Options::AESparsity(
+    "ae-sparsity",
+    "Abstract execution mode (Default: dense)",
+    AbstractInterpretation::AESparsity::Dense,
+{
+    {
+        AbstractInterpretation::AESparsity::Dense, "dense",
+        "Dense abstract execution: all variables propagated along ICFG edges."
+    },
+    {
+        AbstractInterpretation::AESparsity::SemiSparse, "semi-sparse",
+        "Semi-sparse abstract execution: ObjVars dense, ValVars sparse."
+    },
+    {
+        AbstractInterpretation::AESparsity::Sparse, "sparse",
+        "Sparse abstract execution via SVFG."
+    }
+});
+const OptionMap<u32_t> Options::AEFunEntry(
+    "ae-fun-entry",
+    "Abstract execution function entry mode (Default: main)",
+    AbstractInterpretation::AEFunEntryMode::MAIN,
+{
+    {
+        AbstractInterpretation::AEFunEntryMode::MAIN, "main",
+        "Analyze from the program entry function only."
+    },
+    {
+        AbstractInterpretation::AEFunEntryMode::NO_MAIN, "no-main",
+        "Analyze from every no-external-caller SCC after Andersen resolves the call graph."
+    }
+});
 const Option<u32_t> Options::WidenDelay(
     "widen-delay", "Loop Widen Delay", 3);
 const OptionMap<u32_t> Options::HandleRecur(
@@ -831,8 +848,14 @@ const Option<bool> Options::FileCheck(
     "fileck", "File Open/Close Detection",false);
 const Option<bool> Options::DFreeCheck(
     "dfree", "Double Free Detection",false);
-const Option<bool> Options::RaceCheck(
-    "race", "Data race Detection",false);
+const Option<bool> Options::MTFlowSensitive(
+    "mta-flow-sensitive", "MTA: flow-sensitive (FSAM) main analysis; false = Andersen flow-insensitive base", true);
+const Option<bool> Options::DumpMTAGraphs(
+    "mta-dump-graphs", "MTA: dump the pointer-analysis and thread call graphs (ptacg/tcg.dot)", false);
+const Option<bool> Options::MTAEnableSlicing(
+    "mta-enable-slicing", "MTA slicing: slice before the FSAM main analysis (false = whole-program baseline)", true);
+const Option<bool> Options::MTASingleStageSlicing(
+    "mta-slicing-single", "MTA slicing: use one unified slice for both ILA and FSPTA (single-pass baseline)", false);
 const Option<bool> Options::GepUnknownIdx(
     "gep-unknown-idx","Skip Gep Unknown Index",false);
 const Option<bool> Options::RunUncallFuncs(
@@ -845,6 +868,12 @@ const Option<u32_t> Options::AEPrecision(
     "precision",
     "symbolic abstraction precision for float",
     0
+);
+
+const Option<u32_t> Options::MaxNodeLabelLength(
+    "max-node-label-length",
+    "maxmimum length of dumped graph node labels",
+    250
 );
 
 } // namespace SVF.

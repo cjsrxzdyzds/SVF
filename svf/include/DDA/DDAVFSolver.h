@@ -30,12 +30,14 @@
 #ifndef VALUEFLOWDDA_H_
 #define VALUEFLOWDDA_H_
 
+#include <algorithm>
+
 #include "DDA/DDAStat.h"
 #include "Graphs/SCC.h"
 #include "MSSA/SVFGBuilder.h"
 #include "MemoryModel/PointsTo.h"
 #include "WPA/Andersen.h"
-#include <algorithm>
+#include "Util/GeneralType.h"
 
 namespace SVF
 {
@@ -191,7 +193,7 @@ protected:
         }
         else if(const LoadSVFGNode* load = SVFUtil::dyn_cast<LoadSVFGNode>(node))
         {
-            if(load->getPAGDstNode()->isPointer() == false)
+            if(load->getDstNode()->isPointer() == false)
                 return;
 
             CPtSet loadpts;
@@ -203,7 +205,7 @@ protected:
         }
         else if(const StoreSVFGNode* store = SVFUtil::dyn_cast<StoreSVFGNode>(node))
         {
-            if(store->getPAGSrcNode()->isPointer() == false)
+            if(store->getSrcNode()->isPointer() == false)
                 return;
 
             if(isMustAlias(getLoadDpm(dpm),dpm))
@@ -344,9 +346,9 @@ protected:
         }
     }
     /// GetDefinition SVFG
-    inline const SVFGNode* getDefSVFGNode(const PAGNode* pagNode) const
+    inline const SVFGNode* getDefSVFGNode(const ValVar* valVar) const
     {
-        return getSVFG()->getDefSVFGNode(pagNode);
+        return getSVFG()->getDefSVFGNode(valVar);
     }
     /// Backward traverse along indirect value flows
     void backtraceAlongIndirectVF(CPtSet& pts, const DPIm& oldDpm)
@@ -392,33 +394,33 @@ protected:
     inline void startNewPTCompFromLoadSrc(CPtSet& pts, const DPIm& oldDpm)
     {
         const LoadSVFGNode* load = SVFUtil::cast<LoadSVFGNode>(oldDpm.getLoc());
-        const SVFGNode* loadSrc = getDefSVFGNode(load->getPAGSrcNode());
+        const SVFGNode* loadSrc = getDefSVFGNode(load->getSrcNode());
         DBOUT(DDDA, SVFUtil::outs() << "!##start new computation from loadSrc svfgNode " <<
               load->getId() << " --> " << loadSrc->getId() << "\n");
         const SVFGEdge* edge = getSVFG()->getIntraVFGEdge(loadSrc,load,SVFGEdge::IntraDirectVF);
         assert(edge && "Edge not found!!");
-        backwardPropDpm(pts,load->getPAGSrcNodeID(),oldDpm,edge);
+        backwardPropDpm(pts,load->getSrcNodeID(),oldDpm,edge);
 
     }
     inline void startNewPTCompFromStoreDst(CPtSet& pts, const DPIm& oldDpm)
     {
         const StoreSVFGNode* store = SVFUtil::cast<StoreSVFGNode>(oldDpm.getLoc());
-        const SVFGNode* storeDst = getDefSVFGNode(store->getPAGDstNode());
+        const SVFGNode* storeDst = getDefSVFGNode(store->getDstNode());
         DBOUT(DDDA, SVFUtil::outs() << "!##start new computation from storeDst svfgNode " <<
               store->getId() << " --> " << storeDst->getId() << "\n");
         const SVFGEdge* edge = getSVFG()->getIntraVFGEdge(storeDst,store,SVFGEdge::IntraDirectVF);
         assert(edge && "Edge not found!!");
-        backwardPropDpm(pts,store->getPAGDstNodeID(),oldDpm,edge);
+        backwardPropDpm(pts,store->getDstNodeID(),oldDpm,edge);
     }
     inline void backtraceToStoreSrc(CPtSet& pts, const DPIm& oldDpm)
     {
         const StoreSVFGNode* store = SVFUtil::cast<StoreSVFGNode>(oldDpm.getLoc());
-        const SVFGNode* storeSrc = getDefSVFGNode(store->getPAGSrcNode());
+        const SVFGNode* storeSrc = getDefSVFGNode(store->getSrcNode());
         DBOUT(DDDA, SVFUtil::outs() << "++backtrace to storeSrc from svfgNode " << getLoadDpm(oldDpm).getLoc()->getId() << " to "<<
               store->getId() << " to " << storeSrc->getId() <<"\n");
         const SVFGEdge* edge = getSVFG()->getIntraVFGEdge(storeSrc,store,SVFGEdge::IntraDirectVF);
         assert(edge && "Edge not found!!");
-        backwardPropDpm(pts,store->getPAGSrcNodeID(),oldDpm,edge);
+        backwardPropDpm(pts,store->getSrcNodeID(),oldDpm,edge);
     }
     //@}
 
@@ -475,7 +477,7 @@ protected:
         assert(baseObj && "base object is null??");
         if(SVFUtil::isa<StackObjVar>(baseObj))
         {
-            if(const FunObjVar* svffun = _pag->getGNode(id)->getFunction())
+            if(const FunObjVar* svffun = _pag->getSVFVar(id)->getFunction())
             {
                 return _callGraphSCC->isInCycle(_callGraph->getCallGraphNode(svffun)->getId());
             }
@@ -497,7 +499,7 @@ protected:
             {
                 NodeID funPtr = _pag->getFunPtr(cbn);
                 DPIm funPtrDpm(dpm);
-                funPtrDpm.setLocVar(getSVFG()->getDefSVFGNode(_pag->getGNode(funPtr)),funPtr);
+                funPtrDpm.setLocVar(getSVFG()->getDefSVFGNode(_pag->getValVar(funPtr)),funPtr);
                 findPT(funPtrDpm);
             }
         }
@@ -510,7 +512,7 @@ protected:
             {
                 NodeID funPtr = _pag->getFunPtr(*it);
                 DPIm funPtrDpm(dpm);
-                funPtrDpm.setLocVar(getSVFG()->getDefSVFGNode(_pag->getGNode(funPtr)),funPtr);
+                funPtrDpm.setLocVar(getSVFG()->getDefSVFGNode(_pag->getValVar(funPtr)),funPtr);
                 findPT(funPtrDpm);
             }
         }

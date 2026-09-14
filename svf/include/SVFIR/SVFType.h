@@ -30,9 +30,7 @@
 #ifndef INCLUDE_SVFIR_SVFTYPE_H_
 #define INCLUDE_SVFIR_SVFTYPE_H_
 
-#include "Util/SparseBitVector.h"
 #include "Util/GeneralType.h"
-
 
 namespace SVF
 {
@@ -46,7 +44,35 @@ class SVFPointerType;
 class StInfo
 {
 
+    friend class GraphDBClient;
+    friend class IRGraph;
+
+protected:
+    StInfo (u32_t id, std::vector<u32_t> fldIdxVec, std::vector<u32_t> elemIdxVec, Map<u32_t, const SVFType*> fldIdx2TypeMap,
+            std::vector<const SVFType*> finfo,u32_t stride,u32_t numOfFlattenElements,u32_t numOfFlattenFields, std::vector<const SVFType*> flattenElementTypes )
+        :StInfoId(id), fldIdxVec(fldIdxVec), elemIdxVec(elemIdxVec), fldIdx2TypeMap(fldIdx2TypeMap), finfo(finfo), stride(stride),
+         numOfFlattenElements(numOfFlattenElements), numOfFlattenFields(numOfFlattenFields), flattenElementTypes(flattenElementTypes)
+    {
+
+    }
+
+    inline const u32_t getStinfoId() const
+    {
+        return StInfoId;
+    }
+
+    inline const Map<u32_t, const SVFType*>& getFldIdx2TypeMap() const
+    {
+        return fldIdx2TypeMap;
+    }
+
+    inline void setStinfoId(u32_t id)
+    {
+        StInfoId = id;
+    }
+
 private:
+    u32_t StInfoId;
     /// flattened field indices of a struct (ignoring arrays)
     std::vector<u32_t> fldIdxVec;
     /// flattened element indices including structs and arrays by considering
@@ -77,6 +103,7 @@ public:
         : stride(s), numOfFlattenElements(s), numOfFlattenFields(s)
     {
     }
+
     /// Destructor
     ~StInfo() = default;
 
@@ -169,6 +196,20 @@ public:
         SVFArrayTy,
         SVFOtherTy,
     };
+
+protected:
+
+    /// set svfptrty and svfi8ty when initializing SVFType from db query results
+    inline static void setSVFPtrType(SVFType* ptrTy)
+    {
+        svfPtrTy = ptrTy;
+    }
+
+    inline static void setSVFInt8Type(SVFType* i8Ty)
+    {
+        svfI8Ty = i8Ty;
+    }
+
 
 public:
 
@@ -274,6 +315,8 @@ std::ostream& operator<<(std::ostream& os, const SVFType& type);
 class SVFPointerType : public SVFType
 {
 
+    friend class GraphDBClient;
+
 public:
     SVFPointerType(u32_t i, u32_t byteSize = 1)
         : SVFType(true, SVFPointerTy, i, byteSize)
@@ -290,9 +333,17 @@ public:
 
 class SVFIntegerType : public SVFType
 {
+    friend class GraphDBClient;
 
 private:
     short signAndWidth; ///< For printing
+
+protected:
+
+    short getSignAndWidth() const
+    {
+        return signAndWidth;
+    }
 
 public:
     SVFIntegerType(u32_t i, u32_t byteSize = 1) : SVFType(true, SVFIntegerTy, i, byteSize) {}
@@ -317,10 +368,25 @@ public:
 class SVFFunctionType : public SVFType
 {
 
+    friend class GraphDBClient;
 private:
     const SVFType* retTy;
     std::vector<const SVFType*> params;
     bool varArg;
+
+protected:
+    /**
+     * Set return type of function, this is used when loading from DB
+     */
+    const void setReturnType(const SVFType* rt)
+    {
+        retTy = rt;
+    }
+
+    void addParamType(const SVFType* type)
+    {
+        params.push_back(type);
+    }
 
 public:
     SVFFunctionType(u32_t i, const SVFType* rt, const std::vector<const SVFType*>& p, bool isvararg)
@@ -342,7 +408,6 @@ public:
         return params;
     }
 
-
     bool isVarArg() const
     {
         return varArg;
@@ -353,6 +418,19 @@ public:
 
 class SVFStructType : public SVFType
 {
+    friend class GraphDBClient;
+
+protected:
+
+    const std::string& getName() const
+    {
+        return name;
+    }
+
+    void addFieldsType(const SVFType* type)
+    {
+        fields.push_back(type);
+    }
 
 private:
     /// @brief Field for printing & debugging
@@ -376,6 +454,7 @@ public:
     {
         return name;
     }
+
     void setName(const std::string& structName)
     {
         name = structName;
@@ -389,10 +468,18 @@ public:
     {
         return fields;
     }
+
 };
 
 class SVFArrayType : public SVFType
 {
+    friend class GraphDBClient;
+
+protected:
+    const unsigned getNumOfElement() const
+    {
+        return numOfElement;
+    }
 
 private:
     unsigned numOfElement; /// For printing & debugging
@@ -431,6 +518,13 @@ public:
 
 class SVFOtherType : public SVFType
 {
+    friend class GraphDBClient;
+
+protected:
+    const std::string& getRepr() const
+    {
+        return repr;
+    }
 
 private:
     std::string repr; /// Field representation for printing
@@ -459,21 +553,6 @@ public:
     }
 
     void print(std::ostream& os) const override;
-};
-
-// TODO: be explicit that this is a pair of 32-bit unsigneds?
-template <> struct Hash<NodePair>
-{
-    size_t operator()(const NodePair& p) const
-    {
-        // Make sure our assumptions are sound: use u32_t
-        // and u64_t. If NodeID is not actually u32_t or size_t
-        // is not u64_t we should be fine since we get a
-        // consistent result.
-        uint32_t first = (uint32_t)(p.first);
-        uint32_t second = (uint32_t)(p.second);
-        return ((uint64_t)(first) << 32) | (uint64_t)(second);
-    }
 };
 
 #if !defined NDBUG && defined USE_SVF_DBOUT
@@ -523,7 +602,7 @@ template <> struct Hash<NodePair>
  * processor time is measured and is returned by 'clock'.
  */
 #define TIMEINTERVAL 1000
-#define CLOCK_IN_MS() (clock() / (CLOCKS_PER_SEC / TIMEINTERVAL))
+#define CLOCK_IN_MS() (clock() / (CLOCKS_PER_SEC / (double)TIMEINTERVAL))
 
 /// Size of native integer that we'll use for bit vectors, in bits.
 #define NATIVE_INT_SIZE (sizeof(unsigned long long) * CHAR_BIT)
@@ -545,47 +624,5 @@ enum AliasResult
 };
 
 } // End namespace SVF
-
-template <> struct std::hash<SVF::NodePair>
-{
-    size_t operator()(const SVF::NodePair& p) const
-    {
-        // Make sure our assumptions are sound: use u32_t
-        // and u64_t. If NodeID is not actually u32_t or size_t
-        // is not u64_t we should be fine since we get a
-        // consistent result.
-        uint32_t first = (uint32_t)(p.first);
-        uint32_t second = (uint32_t)(p.second);
-        return ((uint64_t)(first) << 32) | (uint64_t)(second);
-    }
-};
-
-/// Specialise hash for SparseBitVectors.
-template <unsigned N> struct std::hash<SVF::SparseBitVector<N>>
-{
-    size_t operator()(const SVF::SparseBitVector<N>& sbv) const
-    {
-        SVF::Hash<std::pair<std::pair<size_t, size_t>, size_t>> h;
-        return h(std::make_pair(std::make_pair(sbv.count(), sbv.find_first()),
-                                sbv.find_last()));
-    }
-};
-
-template <typename T> struct std::hash<std::vector<T>>
-{
-    size_t operator()(const std::vector<T>& v) const
-    {
-        // TODO: repetition with CBV.
-        size_t h = v.size();
-
-        SVF::Hash<T> hf;
-        for (const T& t : v)
-        {
-            h ^= hf(t) + 0x9e3779b9 + (h << 6) + (h >> 2);
-        }
-
-        return h;
-    }
-};
 
 #endif /* INCLUDE_SVFIR_SVFTYPE_H_ */

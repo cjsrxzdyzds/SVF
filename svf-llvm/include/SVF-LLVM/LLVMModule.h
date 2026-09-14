@@ -35,6 +35,8 @@
 #include "SVF-LLVM/BasicTypes.h"
 #include "Util/Options.h"
 #include "Graphs/BasicBlockG.h"
+#include "Graphs/ICFGNode.h"
+#include "SVFIR/SVFIR.h"
 
 namespace SVF
 {
@@ -146,6 +148,7 @@ public:
     {
         delete llvmModuleSet;
         llvmModuleSet = nullptr;
+        NodeIDAllocator::unset();
     }
 
     // Build an SVF module from a given LLVM Module instance (for use e.g. in a LLVM pass)

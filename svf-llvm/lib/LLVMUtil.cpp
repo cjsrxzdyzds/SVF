@@ -29,6 +29,7 @@
 
 #include "SVF-LLVM/LLVMUtil.h"
 #include "SVFIR/ObjTypeInfo.h"
+#include "SVFIR/SVFType.h"
 #include <sstream>
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/raw_ostream.h>
@@ -462,6 +463,14 @@ const std::string LLVMUtil::getSourceLoc(const Value* val )
     {
         if (SVFUtil::isa<AllocaInst>(inst))
         {
+#if LLVM_VERSION_MAJOR >= 20
+            for (llvm::DbgVariableRecord *DVR : llvm::findDVRDeclares(const_cast<Instruction*>(inst)))
+            {
+                llvm::DIVariable *DIVar = DVR->getVariable();
+                rawstr << "\"ln\": " << DIVar->getLine() << ", \"fl\": \"" << DIVar->getFilename().str() << "\"";
+                break;
+            }
+#else
 #if LLVM_VERSION_MAJOR > 16
             for (llvm::DbgInfoIntrinsic *DII : llvm::findDbgDeclares(const_cast<Instruction*>(inst)))
 #else
@@ -475,6 +484,7 @@ const std::string LLVMUtil::getSourceLoc(const Value* val )
                     break;
                 }
             }
+#endif
         }
         else if (MDNode *N = inst->getMetadata("dbg"))   // Here I is an LLVM instruction
         {
@@ -537,7 +547,8 @@ const std::string LLVMUtil::getSourceLoc(const Value* val )
     }
     else if (const BasicBlock* bb = SVFUtil::dyn_cast<BasicBlock>(val))
     {
-        rawstr << "\"basic block\": " << bb->getName().str() << ", \"location\": " << getSourceLoc(bb->getFirstNonPHI());
+        auto nonPhiIt = bb->getFirstNonPHIIt();
+        rawstr << "\"basic block\": " << bb->getName().str() << ", \"location\": " << getSourceLoc(nonPhiIt != bb->end() ? &*nonPhiIt : nullptr);
     }
     else if(LLVMUtil::isConstDataOrAggData(val))
     {
@@ -770,4 +781,9 @@ const std::string SVFValue::valueOnlyToString() const
     return rawstr.str();
 }
 
-} // namespace SVF
+const bool SVFValue::hasLLVMValue() const
+{
+    return LLVMModuleSet::getLLVMModuleSet()->hasLLVMValue(this);
+
+}
+}// namespace SVF

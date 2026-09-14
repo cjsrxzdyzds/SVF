@@ -30,8 +30,13 @@
 #ifndef INCLUDE_MEMORYMODEL_POINTERANALYSISIMPL_H_
 #define INCLUDE_MEMORYMODEL_POINTERANALYSISIMPL_H_
 
-#include <Graphs/ConsG.h>
+#include "Graphs/ConsG.h"
+#include "MemoryModel/PTATY.h"
 #include "MemoryModel/PointerAnalysis.h"
+#include "MemoryModel/AbstractPointsToDS.h"
+#include "MemoryModel/MutablePointsToDS.h"
+#include "MemoryModel/PersistentPointsToDS.h"
+#include "MemoryModel/ConditionalPT.h"
 
 namespace SVF
 {
@@ -62,15 +67,8 @@ public:
     typedef PersistentIncDFPTData<NodeID, NodeSet, NodeID, PointsTo> PersIncDFPTDataTy;
     typedef PersistentVersionedPTData<NodeID, NodeSet, NodeID, PointsTo, VersionedVar, Set<VersionedVar>> PersVersionedPTDataTy;
 
-    /// How the PTData used is implemented.
-    enum PTBackingType
-    {
-        Mutable,
-        Persistent,
-    };
-
     /// Constructor
-    BVDataPTAImpl(SVFIR* pag, PointerAnalysis::PTATY type, bool alias_check = true);
+    BVDataPTAImpl(SVFIR* pag, PTATY type, bool alias_check = true);
 
     /// Destructor
     ~BVDataPTAImpl() override;
@@ -82,7 +80,7 @@ public:
 
     static inline bool classof(const PointerAnalysis *pta)
     {
-        return pta->getImplTy() == BVDataImpl;
+        return pta->getImplTy() == PTAImplTy::BVDataImpl;
     }
 
     /// Get points-to and reverse points-to
@@ -235,6 +233,12 @@ public:
     /// Interface expose to users of our pointer analysis, given two pts
     virtual AliasResult alias(const PointsTo& pts1, const PointsTo& pts2);
 
+    /// Convenience bool wrappers: return true if the two operands may/must/partial alias
+    inline bool mayAlias(const PointsTo& pts1, const PointsTo& pts2)
+    {
+        return alias(pts1, pts2)!= AliasResult::NoAlias;
+    }
+
     /// dump and debug, print out conditional pts
     //@{
     void dumpCPts() override
@@ -265,14 +269,14 @@ public:
     typedef Map<NodeID,CPtSet> PtrToCPtsMap;	 /// map a pointer to its conditional points-to set
 
     /// Constructor
-    CondPTAImpl(SVFIR* pag, PointerAnalysis::PTATY type) : PointerAnalysis(pag, type), normalized(false)
+    CondPTAImpl(SVFIR* pag, PTATY type) : PointerAnalysis(pag, type), normalized(false)
     {
-        if (type == PathS_DDA || type == Cxt_DDA)
+        if (type == PTATY::PathS_DDA || type == PTATY::Cxt_DDA)
             ptD = new MutPTDataTy();
         else
             assert(false && "no points-to data available");
 
-        ptaImplTy = CondImpl;
+        ptaImplTy = PTAImplTy::CondImpl;
     }
 
     /// Destructor
@@ -283,7 +287,7 @@ public:
 
     static inline bool classof(const PointerAnalysis *pta)
     {
-        return pta->getImplTy() == CondImpl;
+        return pta->getImplTy() == PTAImplTy::CondImpl;
     }
 
     /// Release memory
@@ -356,7 +360,7 @@ public:
         expandedCpts = cpts;;
         for(typename CPtSet::const_iterator cit = cpts.begin(), ecit=cpts.end(); cit!=ecit; ++cit)
         {
-            if(pag->getBaseObjVar(cit->get_id())==cit->get_id())
+            if(pag->getBaseObjVarID(cit->get_id())==cit->get_id())
             {
                 NodeBS& fields = pag->getAllFieldsObjVars(cit->get_id());
                 for(NodeBS::iterator it = fields.begin(), eit = fields.end(); it!=eit; ++it)
@@ -535,7 +539,7 @@ public:
         expandFIObjs(pts2,cpts2);
         if (containBlackHoleNode(cpts1) || containBlackHoleNode(cpts2))
             return AliasResult::MayAlias;
-        else if(this->getAnalysisTy()==PathS_DDA && contains(cpts1,cpts2) && contains(cpts2,cpts1))
+        else if(this->getAnalysisTy() == PTATY::PathS_DDA && contains(cpts1,cpts2) && contains(cpts2,cpts1))
         {
             return AliasResult::MustAlias;
         }
@@ -572,7 +576,7 @@ public:
     {
         for (OrderedNodeSet::iterator nIter = this->getAllValidPtrs().begin(); nIter != this->getAllValidPtrs().end(); ++nIter)
         {
-            const PAGNode* node = this->getPAG()->getGNode(*nIter);
+            const SVFVar* node = this->getPAG()->getSVFVar(*nIter);
             if (this->getPAG()->isValidTopLevelPtr(node))
             {
                 if (SVFUtil::isa<DummyObjVar>(node))

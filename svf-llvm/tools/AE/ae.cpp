@@ -136,7 +136,7 @@ public:
             outs() << r.first << " " << r.second.getInterval() << "\n";
         }
         AbstractState::VarToAbsValMap intendedRes = {{0, IntervalValue(0, 1)}, {1, IntervalValue(1, 2)}};
-        assert(AbstractState::eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
+        assert(resBS.eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
     }
 
     void testRelExeState1_2()
@@ -171,7 +171,7 @@ public:
             outs() << r.first << " " << r.second.getInterval() << "\n";
         }
         AbstractState::VarToAbsValMap intendedRes = {{0, IntervalValue(0, 1)}, {1, IntervalValue(0, 2)}};
-        assert(AbstractState::eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
+        assert(resBS.eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
     }
 
     void testRelExeState2_1()
@@ -213,7 +213,7 @@ public:
             {1, IntervalValue(0, 10)},
             {2, IntervalValue(0, 0)}
         };
-        assert(AbstractState::eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
+        assert(resBS.eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
     }
 
     void testRelExeState2_2()
@@ -256,7 +256,7 @@ public:
             {1, IntervalValue(0, 100)},
             {2, IntervalValue(0, 0)}
         };
-        assert(AbstractState::eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
+        assert(resBS.eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
     }
 
     void testRelExeState2_3()
@@ -299,7 +299,7 @@ public:
             {1, IntervalValue(0, 1000)},
             {2, IntervalValue(0, 0)}
         };
-        assert(AbstractState::eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
+        assert(resBS.eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
     }
 
     void testRelExeState2_4()
@@ -342,7 +342,7 @@ public:
             {1, IntervalValue(0, 10000)},
             {2, IntervalValue(0, 0)}
         };
-        assert(AbstractState::eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
+        assert(resBS.eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
     }
 
     void testRelExeState2_5()
@@ -385,7 +385,7 @@ public:
             {1, IntervalValue(0, 100000)},
             {2, IntervalValue(0, 0)}
         };
-        assert(AbstractState::eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
+        assert(resBS.eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
     }
 
     void testRelExeState3_1()
@@ -427,7 +427,7 @@ public:
             {1, IntervalValue(1, 10)},
             {2, IntervalValue(1, 1)}
         };
-        assert(AbstractState::eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
+        assert(resBS.eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
     }
 
     void testRelExeState3_2()
@@ -469,7 +469,7 @@ public:
             {1, IntervalValue(1, 1000)},
             {2, IntervalValue(1, 1)}
         };
-        assert(AbstractState::eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
+        assert(resBS.eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
     }
 
     void testRelExeState3_3()
@@ -552,7 +552,7 @@ public:
             {1, IntervalValue(1, 100000)},
             {2, IntervalValue(1, 1)}
         };
-        assert(AbstractState::eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
+        assert(resBS.eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
     }
 
     void testRelExeState4_1()
@@ -597,7 +597,7 @@ public:
             {1, IntervalValue(0, 10)},
             {2, IntervalValue(0, 10)}
         };
-        assert(AbstractState::eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
+        assert(resBS.eqVarToValMap(resBS.getVarToVal(), intendedRes) && "inconsistency occurs");
     }
 
     void testsValidation()
@@ -832,10 +832,15 @@ public:
         as[2] = IntervalValue(2, 7);
         as[3] = AddressValue(0x7f000007);
         as[4] = AddressValue(0x7f000008);
-        as.storeValue(3, as[1]);
-        as.storeValue(4, as[2]);
+        // store: *as[3] = as[1], *as[4] = as[2]
+        for (auto addr : as[3].getAddrs()) as.store(addr, as[1]);
+        for (auto addr : as[4].getAddrs()) as.store(addr, as[2]);
         as.printAbstractState();
-        assert(as.loadValue(3).equals(as[1]) && as.loadValue(4).equals(as[2]));
+        // load: verify *as[3] == as[1] && *as[4] == as[2]
+        AbstractValue v3, v4;
+        for (auto addr : as[3].getAddrs()) v3.join_with(as.load(addr));
+        for (auto addr : as[4].getAddrs()) v4.join_with(as.load(addr));
+        assert(v3.equals(as[1]) && v4.equals(as[2]));
     }
 };
 
@@ -878,16 +883,16 @@ int main(int argc, char** argv)
     LLVMModuleSet::getLLVMModuleSet()->buildSVFModule(moduleNameVec);
     SVFIRBuilder builder;
     SVFIR* pag = builder.build();
+    // Run Andersen's to resolve indirect calls, then update SVFIR with resolved targets.
+    // The Andersen singleton will be reused inside AbstractInterpretation::runOnModule().
     AndersenWaveDiff* ander = AndersenWaveDiff::createAndersenWaveDiff(pag);
-    CallGraph* callgraph = ander->getCallGraph();
-    builder.updateCallGraph(callgraph);
-    pag->getICFG()->updateCallGraph(callgraph);
+    builder.updateCallGraph(ander->getCallGraph());
     AbstractInterpretation& ae = AbstractInterpretation::getAEInstance();
     if (Options::BufferOverflowCheck())
         ae.addDetector(std::make_unique<BufOverflowDetector>());
     if (Options::NullDerefCheck())
         ae.addDetector(std::make_unique<NullptrDerefDetector>());
-    ae.runOnModule(pag->getICFG());
+    ae.runOnModule();
 
     AndersenWaveDiff::releaseAndersenWaveDiff();
     LLVMModuleSet::releaseLLVMModuleSet();

@@ -28,6 +28,8 @@
  */
 
 #include "Graphs/ConsG.h"
+#include "Graphs/GraphPrinter.h"
+#include "Util/GeneralType.h"
 #include "Util/Options.h"
 
 using namespace SVF;
@@ -47,7 +49,7 @@ void ConstraintGraph::buildCG()
     }
 
     // initialize edges
-    SVFStmt::SVFStmtSetTy& addrs = getPAGEdgeSet(SVFStmt::Addr);
+    SVFStmt::SVFStmtSetTy& addrs = getSVFStmtSet(SVFStmt::Addr);
     for (SVFStmt::SVFStmtSetTy::iterator iter = addrs.begin(), eiter =
                 addrs.end(); iter != eiter; ++iter)
     {
@@ -55,7 +57,7 @@ void ConstraintGraph::buildCG()
         addAddrCGEdge(edge->getRHSVarID(),edge->getLHSVarID());
     }
 
-    SVFStmt::SVFStmtSetTy& copys = getPAGEdgeSet(SVFStmt::Copy);
+    SVFStmt::SVFStmtSetTy& copys = getSVFStmtSet(SVFStmt::Copy);
     for (SVFStmt::SVFStmtSetTy::iterator iter = copys.begin(), eiter =
                 copys.end(); iter != eiter; ++iter)
     {
@@ -78,7 +80,7 @@ void ConstraintGraph::buildCG()
         for (const auto& [src, dst] : pag->getExtraAggCopyPairs())
             addCopyCGEdge(src, dst);
 
-    SVFStmt::SVFStmtSetTy& phis = getPAGEdgeSet(SVFStmt::Phi);
+    SVFStmt::SVFStmtSetTy& phis = getSVFStmtSet(SVFStmt::Phi);
     for (SVFStmt::SVFStmtSetTy::iterator iter = phis.begin(), eiter =
                 phis.end(); iter != eiter; ++iter)
     {
@@ -87,7 +89,7 @@ void ConstraintGraph::buildCG()
             addCopyCGEdge(opVar->getId(),edge->getResID());
     }
 
-    SVFStmt::SVFStmtSetTy& selects = getPAGEdgeSet(SVFStmt::Select);
+    SVFStmt::SVFStmtSetTy& selects = getSVFStmtSet(SVFStmt::Select);
     for (SVFStmt::SVFStmtSetTy::iterator iter = selects.begin(), eiter =
                 selects.end(); iter != eiter; ++iter)
     {
@@ -96,15 +98,16 @@ void ConstraintGraph::buildCG()
             addCopyCGEdge(opVar->getId(),edge->getResID());
     }
 
-    SVFStmt::SVFStmtSetTy& calls = getPAGEdgeSet(SVFStmt::Call);
+    SVFStmt::SVFStmtSetTy& calls = getSVFStmtSet(SVFStmt::Call);
     for (SVFStmt::SVFStmtSetTy::iterator iter = calls.begin(), eiter =
                 calls.end(); iter != eiter; ++iter)
     {
-        const CallPE* edge = SVFUtil::cast<CallPE>(*iter);
-        addCopyCGEdge(edge->getRHSVarID(),edge->getLHSVarID());
+        const CallPE* callPE = SVFUtil::cast<CallPE>(*iter);
+        for(u32_t i = 0; i < callPE->getOpVarNum(); i++)
+            addCopyCGEdge(callPE->getOpVarID(i), callPE->getResID());
     }
 
-    SVFStmt::SVFStmtSetTy& rets = getPAGEdgeSet(SVFStmt::Ret);
+    SVFStmt::SVFStmtSetTy& rets = getSVFStmtSet(SVFStmt::Ret);
     for (SVFStmt::SVFStmtSetTy::iterator iter = rets.begin(), eiter =
                 rets.end(); iter != eiter; ++iter)
     {
@@ -112,15 +115,16 @@ void ConstraintGraph::buildCG()
         addCopyCGEdge(edge->getRHSVarID(),edge->getLHSVarID());
     }
 
-    SVFStmt::SVFStmtSetTy& tdfks = getPAGEdgeSet(SVFStmt::ThreadFork);
+    SVFStmt::SVFStmtSetTy& tdfks = getSVFStmtSet(SVFStmt::ThreadFork);
     for (SVFStmt::SVFStmtSetTy::iterator iter = tdfks.begin(), eiter =
                 tdfks.end(); iter != eiter; ++iter)
     {
-        const TDForkPE* edge = SVFUtil::cast<TDForkPE>(*iter);
-        addCopyCGEdge(edge->getRHSVarID(),edge->getLHSVarID());
+        const TDForkPE* forkPE = SVFUtil::cast<TDForkPE>(*iter);
+        for(u32_t i = 0; i < forkPE->getOpVarNum(); i++)
+            addCopyCGEdge(forkPE->getOpVarID(i), forkPE->getResID());
     }
 
-    SVFStmt::SVFStmtSetTy& tdjns = getPAGEdgeSet(SVFStmt::ThreadJoin);
+    SVFStmt::SVFStmtSetTy& tdjns = getSVFStmtSet(SVFStmt::ThreadJoin);
     for (SVFStmt::SVFStmtSetTy::iterator iter = tdjns.begin(), eiter =
                 tdjns.end(); iter != eiter; ++iter)
     {
@@ -128,7 +132,7 @@ void ConstraintGraph::buildCG()
         addCopyCGEdge(edge->getRHSVarID(),edge->getLHSVarID());
     }
 
-    SVFStmt::SVFStmtSetTy& ngeps = getPAGEdgeSet(SVFStmt::Gep);
+    SVFStmt::SVFStmtSetTy& ngeps = getSVFStmtSet(SVFStmt::Gep);
     for (SVFStmt::SVFStmtSetTy::iterator iter = ngeps.begin(), eiter =
                 ngeps.end(); iter != eiter; ++iter)
     {
@@ -139,7 +143,7 @@ void ConstraintGraph::buildCG()
             addNormalGepCGEdge(edge->getRHSVarID(),edge->getLHSVarID(),edge->getAccessPath());
     }
 
-    SVFStmt::SVFStmtSetTy& loads = getPAGEdgeSet(SVFStmt::Load);
+    SVFStmt::SVFStmtSetTy& loads = getSVFStmtSet(SVFStmt::Load);
     for (SVFStmt::SVFStmtSetTy::iterator iter = loads.begin(), eiter =
                 loads.end(); iter != eiter; ++iter)
     {
@@ -147,7 +151,7 @@ void ConstraintGraph::buildCG()
         addLoadCGEdge(edge->getRHSVarID(),edge->getLHSVarID());
     }
 
-    SVFStmt::SVFStmtSetTy& stores = getPAGEdgeSet(SVFStmt::Store);
+    SVFStmt::SVFStmtSetTy& stores = getSVFStmtSet(SVFStmt::Store);
     for (SVFStmt::SVFStmtSetTy::iterator iter = stores.begin(), eiter =
                 stores.end(); iter != eiter; ++iter)
     {
@@ -177,7 +181,7 @@ void ConstraintGraph::clearSolitaries()
     {
         if (it->second->hasIncomingEdge() || it->second->hasOutgoingEdge())
             continue;
-        if (pag->getGNode(it->first)->isPointer())
+        if (pag->getSVFVar(it->first)->isPointer())
             continue;
         if (retFromIndCalls.find(it->first)!=retFromIndCalls.end())
             continue;
@@ -202,7 +206,7 @@ AddrCGEdge::AddrCGEdge(ConstraintNode* s, ConstraintNode* d, EdgeID id)
     : ConstraintEdge(s,d,Addr,id)
 {
     // Retarget addr edges may lead s to be a dummy node
-    PAGNode* node = SVFIR::getPAG()->getGNode(s->getId());
+    const SVFVar* node = SVFIR::getPAG()->getSVFVar(s->getId());
     (void)node; // Suppress warning of unused variable under release build
     if (!SVFIR::pagReadFromTXT())
     {
@@ -744,7 +748,7 @@ ConstraintNode::const_iterator ConstraintNode::directInEdgeEnd() const
 
 const std::string ConstraintNode::toString() const
 {
-    return SVFIR::getPAG()->getGNode(getId())->toString();
+    return SVFIR::getPAG()->getSVFVar(getId())->toString();
 }
 
 /*!
@@ -778,7 +782,7 @@ struct DOTGraphTraits<ConstraintGraph*> : public DOTGraphTraits<SVFIR*>
     /// Either you can choose to display the name of the value or the whole instruction
     static std::string getNodeLabel(NodeType *n, ConstraintGraph*)
     {
-        PAGNode* node = SVFIR::getPAG()->getGNode(n->getId());
+        const SVFVar* node = SVFIR::getPAG()->getSVFVar(n->getId());
         bool briefDisplay = Options::BriefConsCGDotGraph();
         bool nameDisplay = true;
         std::string str;
@@ -811,7 +815,7 @@ struct DOTGraphTraits<ConstraintGraph*> : public DOTGraphTraits<SVFIR*>
 
     static std::string getNodeAttributes(NodeType *n, ConstraintGraph*)
     {
-        PAGNode* node = SVFIR::getPAG()->getGNode(n->getId());
+        const SVFVar* node = SVFIR::getPAG()->getSVFVar(n->getId());
         if (SVFUtil::isa<ValVar>(node))
         {
             if(SVFUtil::isa<GepValVar>(node))
@@ -863,7 +867,7 @@ struct DOTGraphTraits<ConstraintGraph*> : public DOTGraphTraits<SVFIR*>
         else if (edge->getEdgeKind() == ConstraintEdge::NormalGep
                  || edge->getEdgeKind() == ConstraintEdge::VariantGep)
         {
-            return "color=purple";
+            return "color=\"purple:purple\"";
         }
         else if (edge->getEdgeKind() == ConstraintEdge::Store)
         {

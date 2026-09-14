@@ -65,8 +65,8 @@ void LeakChecker::initSrcs()
                 {
                     const CallICFGNode* cs = worklist.pop();
                     const RetICFGNode* retBlockNode = cs->getRetICFGNode();
-                    const PAGNode* pagNode = pag->getCallSiteRet(retBlockNode);
-                    const SVFGNode* node = getSVFG()->getDefSVFGNode(pagNode);
+                    const ValVar* svfVar = pag->getCallSiteRet(retBlockNode);
+                    const SVFGNode* node = getSVFG()->getDefSVFGNode(svfVar);
                     if (visited.test(node->getId()) == 0)
                         visited.set(node->getId());
                     else
@@ -118,21 +118,21 @@ void LeakChecker::initSnks()
             const FunObjVar* fun = *cit;
             if (isSinkLikeFun(fun))
             {
-                SVFIR::SVFVarList &arglist = it->second;
+                SVFIR::ValVarList &arglist = it->second;
                 assert(!arglist.empty()	&& "no actual parameter at deallocation site?");
                 /// we only choose pointer parameters among all the actual parameters
-                for (SVFIR::SVFVarList::const_iterator ait = arglist.begin(),
+                for (SVFIR::ValVarList::const_iterator ait = arglist.begin(),
                         aeit = arglist.end(); ait != aeit; ++ait)
                 {
-                    const PAGNode *pagNode = *ait;
-                    if (pagNode->isPointer())
+                    const SVFVar *svfVar = *ait;
+                    if (svfVar->isPointer())
                     {
-                        const SVFGNode *snk = getSVFG()->getActualParmVFGNode(pagNode, it->first);
+                        const SVFGNode *snk = getSVFG()->getActualParmVFGNode(svfVar, it->first);
                         addToSinks(snk);
 
-                        // For any multi-level pointer e.g., XFree(void** pagNode) that passed into a ExtAPI::EFT_FREE_MULTILEVEL function (e.g., XFree),
-                        // we will add the DstNode of a load edge, i.e., dummy = *pagNode
-                        SVFStmt::SVFStmtSetTy& loads = const_cast<PAGNode*>(pagNode)->getOutgoingEdges(SVFStmt::Load);
+                        // For any multi-level pointer e.g., XFree(void** svfVar) that passed into a ExtAPI::EFT_FREE_MULTILEVEL function (e.g., XFree),
+                        // we will add the DstNode of a load edge, i.e., dummy = *svfVar
+                        SVFStmt::SVFStmtSetTy& loads = const_cast<SVFVar*>(svfVar)->getOutgoingEdges(SVFStmt::Load);
                         for(const SVFStmt* ld : loads)
                         {
                             if(SVFUtil::isa<DummyValVar>(ld->getDstNode()))
@@ -230,16 +230,31 @@ void LeakChecker::validateSuccessTests(const SVFGNode* source, const FunObjVar* 
 
     if (success)
     {
-        outs() << sucMsg("\t SUCCESS :") << funName << " check <src id:" << source->getId()
-               << ", cs id:" << (getSrcCSID(source))->valueOnlyToString() << "> at ("
-               << cs->getSourceLoc() << ")\n";
+        if ((getSrcCSID(source))->hasLLVMValue())
+        {
+            outs() << sucMsg("\t SUCCESS :") << funName << " check <src id:" << source->getId()
+                   << ", cs id:" << (getSrcCSID(source))->valueOnlyToString() << "> at ("
+                   << cs->getSourceLoc() << ")\n";
+        }
+        else
+        {
+            outs() << sucMsg("\t SUCCESS :") << funName<<"\n";
+        }
     }
     else
     {
-        SVFUtil::errs() << errMsg("\t FAILURE :") << funName << " check <src id:" << source->getId()
-                        << ", cs id:" << (getSrcCSID(source))->valueOnlyToString() << "> at ("
-                        << cs->getSourceLoc() << ")\n";
-        assert(false && "test case failed!");
+        if ((getSrcCSID(source))->hasLLVMValue())
+        {
+            SVFUtil::errs() << errMsg("\t FAILURE :") << funName << " check <src id:" << source->getId()
+                            << ", cs id:" << (getSrcCSID(source))->valueOnlyToString() << "> at ("
+                            << cs->getSourceLoc() << ")\n";
+            assert(false && "test case failed!");
+        }
+        else
+        {
+            SVFUtil::errs() << errMsg("\t FAILURE :") << funName <<  "\n";
+            assert(false && "test case failed!");
+        }
     }
 }
 
@@ -280,12 +295,23 @@ void LeakChecker::validateExpectedFailureTests(const SVFGNode* source, const Fun
 
     if (expectedFailure)
     {
+        if (!(getSrcCSID(source))->hasLLVMValue())
+        {
+            outs() << sucMsg("\t EXPECTED-FAILURE :") << funName <<"\n";
+            return;
+        }
         outs() << sucMsg("\t EXPECTED-FAILURE :") << funName << " check <src id:" << source->getId()
                << ", cs id:" << (getSrcCSID(source))->valueOnlyToString() << "> at ("
                << cs->getSourceLoc() << ")\n";
     }
     else
     {
+        if (!(getSrcCSID(source))->hasLLVMValue())
+        {
+            SVFUtil::errs() << errMsg("\t UNEXPECTED FAILURE :") << funName <<"\n";
+            assert(false && "test case failed!");
+            return;
+        }
         SVFUtil::errs() << errMsg("\t UNEXPECTED FAILURE :") << funName
                         << " check <src id:" << source->getId()
                         << ", cs id:" << (getSrcCSID(source))->valueOnlyToString() << "> at ("

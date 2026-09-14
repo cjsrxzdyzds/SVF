@@ -35,12 +35,12 @@
 #define DDACLIENT_H_
 
 #include "SVFIR/SVFIR.h"
-#include "MemoryModel/PointerAnalysisImpl.h"
 #include "Graphs/SVFG.h"
-#include "SVFIR/SVFValue.h"
 
 namespace SVF
 {
+
+class PointerAnalysis;
 
 /**
  * General DDAClient which queries all top level pointers by default.
@@ -100,7 +100,7 @@ public:
 protected:
     void addCandidate(NodeID id)
     {
-        if (pag->isValidTopLevelPtr(pag->getGNode(id)))
+        if (pag->isValidTopLevelPtr(pag->getSVFVar(id)))
             candidateQueries.insert(id);
     }
 

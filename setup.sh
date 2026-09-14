@@ -18,7 +18,7 @@ function set_llvm {
     [[ -n "$LLVM_DIR" ]] && return 0
 
     # use local download directory
-    LLVM_DIR="$SVF_DIR/llvm-16.0.0.obj"
+    LLVM_DIR="$SVF_DIR/llvm-21.1.0.obj"
     [[ -d "$LLVM_DIR" ]] && return 0
 
     # ... otherwise don't set LLVM_DIR
@@ -74,3 +74,5 @@ export PATH=$SVF_DIR/$Build/bin:$PATH
 
 # Add compiled library directories to $LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$SVF_DIR/$Build/svf:$SVF_DIR/$Build/svf-llvm:$LD_LIBRARY_PATH
+
+echo "Added SVF, LLVM, and Z3 to each of \$PATH, \$LD_LIBRARY_PATH, and \$DYLD_LIBRARY_PATH."

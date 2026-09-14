@@ -40,7 +40,7 @@ using namespace SVFUtil;
  * Constructor
  */
 ContextDDA::ContextDDA(SVFIR* _pag,  DDAClient* client)
-    : CondPTAImpl<ContextCond>(_pag, PointerAnalysis::Cxt_DDA),DDAVFSolver<CxtVar,CxtPtSet,CxtLocDPItem>(),
+    : CondPTAImpl<ContextCond>(_pag, PTATY::Cxt_DDA),DDAVFSolver<CxtVar,CxtPtSet,CxtLocDPItem>(),
       _client(client)
 {
     flowDDA = new FlowDDA(_pag, client);
@@ -79,7 +79,7 @@ const CxtPtSet& ContextDDA::computeDDAPts(const CxtVar& var)
     LocDPItem::setMaxBudget(Options::CxtBudget());
 
     NodeID id = var.get_id();
-    PAGNode* node = getPAG()->getGNode(id);
+    const ValVar* node = getPAG()->getValVar(id);
     CxtLocDPItem dpm = getDPIm(var, getDefSVFGNode(node));
 
     // start DDA analysis
@@ -162,7 +162,7 @@ CxtPtSet ContextDDA::processGepPts(const GepSVFGNode* gep, const CxtPtSet& srcPt
             tmpDstPts.set(ptd);
         else
         {
-            const GepStmt* gepStmt = SVFUtil::cast<GepStmt>(gep->getPAGEdge());
+            const GepStmt* gepStmt = SVFUtil::cast<GepStmt>(gep->getSVFStmt());
             if (gepStmt->isVariantFieldGep())
             {
                 setObjFieldInsensitive(ptd.get_id());
@@ -191,7 +191,7 @@ bool ContextDDA::testIndCallReachability(CxtLocDPItem& dpm, const FunObjVar* cal
     if(getPAG()->isIndirectCallSites(cs))
     {
         NodeID id = getPAG()->getFunPtr(cs);
-        PAGNode* node = getPAG()->getGNode(id);
+        const ValVar* node = getPAG()->getValVar(id);
         CxtVar funptrVar(dpm.getCondVar().get_cond(), id);
         CxtLocDPItem funptrDpm = getDPIm(funptrVar,getDefSVFGNode(node));
         PointsTo pts = getBVPointsTo(findPT(funptrDpm));
@@ -342,11 +342,11 @@ bool ContextDDA::isHeapCondMemObj(const CxtVar& var, const StoreSVFGNode*)
     {
         if (!isa<DummyObjVar>(baseVar))
         {
-            PAGNode *pnode = _pag->getGNode(getPtrNodeID(var));
-            GepObjVar* gepobj = SVFUtil::dyn_cast<GepObjVar>(pnode);
+            const SVFVar* pnode = _pag->getSVFVar(getPtrNodeID(var));
+            const GepObjVar* gepobj = SVFUtil::dyn_cast<GepObjVar>(pnode);
             if (gepobj != nullptr)
             {
-                assert(SVFUtil::isa<DummyObjVar>(_pag->getGNode(gepobj->getBaseNode()))
+                assert(SVFUtil::isa<DummyObjVar>(_pag->getSVFVar(gepobj->getBaseNode()))
                        && "empty refVal in a gep object whose base is a non-dummy object");
             }
             else

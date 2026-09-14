@@ -33,9 +33,12 @@
 #include "Util/SVFUtil.h"
 #include "SVF-LLVM/BasicTypes.h"
 #include "Util/ThreadAPI.h"
+#include "Util/Options.h"
 
 namespace SVF
 {
+
+class SVFBasicBlock;
 
 namespace LLVMUtil
 {
@@ -112,7 +115,8 @@ const Function* getProgFunction(const std::string& funName);
 /// Check whether a function is an entry function (i.e., main)
 inline bool isProgEntryFunction(const Function* fun)
 {
-    return fun && fun->getName() == "main";
+    const char* main_name=Options::SVFMain() ? "svf.main" : "main";
+    return fun && fun->getName() == main_name;
 }
 
 /// Check whether this value is a black hole
@@ -135,7 +139,9 @@ static inline Type* getPtrElementType(const PointerType* pty)
     assert(!pty->isOpaque() && "Opaque Pointer is used, please recompile the source adding '-Xclang -no-opaque-pointers'");
     return pty->getNonOpaquePointerElementType();
 #else
+    (void)pty; // Suppress warning of unused variable under release build
     assert(false && "llvm version 17+ only support opaque pointers!");
+    return nullptr;
 #endif
 }
 

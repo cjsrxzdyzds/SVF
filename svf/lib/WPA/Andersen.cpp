@@ -27,12 +27,14 @@
  *      Author: Yulei Sui
  */
 
-#include "Util/Options.h"
-#include "Graphs/CHG.h"
-#include "Util/SVFUtil.h"
+#include "Graphs/ThreadCallGraph.h"
 #include "MemoryModel/PointsTo.h"
 #include "WPA/Andersen.h"
 #include "WPA/Steensgaard.h"
+#include "WPA/WPAStat.h"
+#include "Util/GeneralType.h"
+#include "Util/Options.h"
+#include "Util/SVFUtil.h"
 
 using namespace SVF;
 using namespace SVFUtil;
@@ -309,12 +311,12 @@ void AndersenBase::connectCaller2CalleeParams(const CallICFGNode* cs,
     {
 
         // connect actual and formal param
-        const SVFIR::SVFVarList& csArgList = pag->getCallSiteArgsList(callBlockNode);
-        const SVFIR::SVFVarList& funArgList = pag->getFunArgsList(F);
+        const SVFIR::ValVarList& csArgList = pag->getCallSiteArgsList(callBlockNode);
+        const SVFIR::ValVarList& funArgList = pag->getFunArgsList(F);
         //Go through the fixed parameters.
         DBOUT(DPAGBuild, outs() << "      args:");
-        SVFIR::SVFVarList::const_iterator funArgIt = funArgList.begin(), funArgEit = funArgList.end();
-        SVFIR::SVFVarList::const_iterator csArgIt  = csArgList.begin(), csArgEit = csArgList.end();
+        SVFIR::ValVarList::const_iterator funArgIt = funArgList.begin(), funArgEit = funArgList.end();
+        SVFIR::ValVarList::const_iterator csArgIt  = csArgList.begin(), csArgEit = csArgList.end();
         for (; funArgIt != funArgEit; ++csArgIt, ++funArgIt)
         {
             //Some programs (e.g. Linux kernel) leave unneeded parameters empty.
@@ -394,21 +396,21 @@ void AndersenBase::heapAllocatorViaIndCall(const CallICFGNode* cs, NodePairSet &
 void AndersenBase::normalizePointsTo()
 {
     SVFIR::MemObjToFieldsMap &memToFieldsMap = pag->getMemToFieldsMap();
-    SVFIR::NodeOffsetMap &GepObjVarMap = pag->getGepObjNodeMap();
+    SVFIR::OffsetToGepVarMap &GepObjVarMap = pag->getGepObjNodeMap();
 
     // clear GepObjVarMap/memToFieldsMap/nodeToSubsMap/nodeToRepMap
     // for redundant gepnodes and remove those nodes from pag
     for (NodeID n: redundantGepNodes)
     {
-        NodeID base = pag->getBaseObjVar(n);
-        GepObjVar *gepNode = SVFUtil::dyn_cast<GepObjVar>(pag->getGNode(n));
+        NodeID base = pag->getBaseObjVarID(n);
+        const GepObjVar* gepNode = pag->getGepObjVar(n);
         assert(gepNode && "Not a gep node in redundantGepNodes set");
         const APOffset apOffset = gepNode->getConstantFieldIdx();
         GepObjVarMap.erase(std::make_pair(base, apOffset));
         memToFieldsMap[base].reset(n);
         cleanConsCG(n);
 
-        pag->removeGNode(gepNode);
+        pag->removeGNode(const_cast<GepObjVar*>(gepNode));
     }
 }
 
@@ -431,7 +433,6 @@ void Andersen::initialize()
  */
 void Andersen::finalize()
 {
-    // TODO: check -stat too.
     // TODO: broken
     if (Options::ClusterAnder())
     {
@@ -440,7 +441,10 @@ void Andersen::finalize()
         // TODO: should we use liveOnly?
         // TODO: parameterise final arg.
         NodeIDAllocator::Clusterer::evaluate(*PointsTo::getCurrentBestNodeMapping(), ptd->getAllPts(true), stats, true);
-        NodeIDAllocator::Clusterer::printStats("post-main", stats);
+        if (print_stat)
+        {
+            NodeIDAllocator::Clusterer::printStats("post-main", stats);
+        }
     }
 
     /// sanitize field insensitive obj
@@ -560,7 +564,7 @@ bool Andersen::processLoad(NodeID node, const ConstraintEdge* load)
     // integer memory, so the pointer-type guard must not drop it.
     if (pag->isConstantObj(node) ||
         (!Options::AdmitI2PCopy() &&
-         pag->getGNode(load->getDstID())->isPointer() == false))
+         pag->getSVFVar(load->getDstID())->isPointer() == false))
         return false;
 
     numOfProcessedLoad++;
@@ -585,7 +589,7 @@ bool Andersen::processStore(NodeID node, const ConstraintEdge* store)
     // not drop it.
     if (pag->isConstantObj(node) ||
         (!Options::AdmitI2PCopy() &&
-         pag->getGNode(store->getSrcID())->isPointer() == false))
+         pag->getSVFVar(store->getSrcID())->isPointer() == false))
         return false;
 
     numOfProcessedStore++;
@@ -649,7 +653,7 @@ bool Andersen::processGepPts(const PointsTo& pts, const GepCGEdge* edge)
             if (!isFieldInsensitive(o))
             {
                 setObjFieldInsensitive(o);
-                consCG->addNodeToBeCollapsed(consCG->getBaseObjVar(o));
+                consCG->addNodeToBeCollapsed(consCG->getBaseObjVarID(o));
             }
 
             // Add the field-insensitive node into pts.
@@ -727,6 +731,11 @@ void Andersen::mergeSccCycle()
         const NodeBS& subNodes = getSCCDetector()->subNodes(repNodeId);
         // merge sub nodes to rep node
         mergeSccNodes(repNodeId, subNodes);
+        if (subNodes.count() > 1)
+        {
+            pushIntoWorklist(repNodeId);
+            reanalyze = true;
+        }
     }
 }
 
@@ -926,7 +935,9 @@ void Andersen::cluster(void) const
 
     std::vector<std::pair<hclust_fast_methods, std::vector<NodeID>>> candidates;
     PointsTo::MappingPtr nodeMapping =
-        std::make_shared<std::vector<NodeID>>(NodeIDAllocator::Clusterer::cluster(steens, keys, candidates, "aux-steens"));
+        std::make_shared<std::vector<NodeID>>(
+            NodeIDAllocator::Clusterer::cluster(steens, keys, candidates, "aux-steens", print_stat)
+        );
     PointsTo::MappingPtr reverseNodeMapping =
         std::make_shared<std::vector<NodeID>>(NodeIDAllocator::Clusterer::getReverseNodeMapping(*nodeMapping));
 
@@ -941,7 +952,7 @@ void Andersen::dumpTopLevelPtsTo()
     for (OrderedNodeSet::iterator nIter = this->getAllValidPtrs().begin();
             nIter != this->getAllValidPtrs().end(); ++nIter)
     {
-        const PAGNode* node = getPAG()->getGNode(*nIter);
+        const SVFVar* node = getPAG()->getSVFVar(*nIter);
         if (getPAG()->isValidTopLevelPtr(node))
         {
             const PointsTo& pts = this->getPts(node->getId());
@@ -964,7 +975,7 @@ void Andersen::dumpTopLevelPtsTo()
                 for (multiset<u32_t>::const_iterator it = line.begin(); it != line.end(); ++it)
                 {
                     if(Options::PrintFieldWithBasePrefix())
-                        if (auto gepNode = SVFUtil::dyn_cast<GepObjVar>(pag->getGNode(*it)))
+                        if (auto gepNode = pag->getGepObjVar(*it))
                             outs() << gepNode->getBaseNode() << "_" << gepNode->getConstantFieldIdx() << " ";
                         else
                             outs() << *it << " ";

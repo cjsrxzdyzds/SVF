@@ -46,6 +46,7 @@ namespace SVF
  */
 class SVFIRBuilder: public llvm::InstVisitor<SVFIRBuilder>
 {
+    friend class GraphDBSVFIRBuilder;
 
 private:
     SVFIR* pag;
@@ -256,6 +257,7 @@ protected:
     //@{
     virtual const Type *getBaseTypeAndFlattenedFields(const Value *V, std::vector<AccessPath> &fields, const Value* szValue);
     virtual void addComplexConsForExt(Value *D, Value *S, const Value* sz);
+    virtual void handleNondetArgStoreAtExtCall(const CallBase* cs, const CallICFGNode* callICFGNode);
     virtual void handleExtCall(const CallBase* cs, const Function* callee);
     //@}
 
@@ -349,7 +351,7 @@ protected:
         }
         else
         {
-            SVFUtil::wrnMsg("not support indirect call to add AddrStmt.\n");
+            SVFUtil::writeWrnMsg("not support indirect call to add AddrStmt.\n");
         }
         if (functionName == "malloc")
         {

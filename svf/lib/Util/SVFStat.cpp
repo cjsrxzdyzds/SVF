@@ -27,6 +27,9 @@
  *      Author: Xiao Cheng
  */
 
+#include <iomanip>
+
+#include "SVFIR/SVFIR.h"
 #include "Util/Options.h"
 #include "Util/SVFStat.h"
 #include "Graphs/CallGraph.h"
@@ -178,7 +181,7 @@ void SVFStat::performStat()
     generalNumMap["TotalObjects"] = pag->getObjectNodeNum();
     generalNumMap["TotalFieldObjects"] = pag->getFieldObjNodeNum();
     generalNumMap["MaxStructSize"] = pag->getMaxStructSize();
-    generalNumMap["TotalSVFStmts"] = pag->getPAGEdgeNum();
+    generalNumMap["TotalSVFStmts"] = pag->getSVFStmtNum();
     generalNumMap["TotalPTASVFStmts"] = pag->getPTAPAGEdgeNum();
     generalNumMap["FIObjNum"] = fiObjNumber;
     generalNumMap["FSObjNum"] = fsObjNumber;

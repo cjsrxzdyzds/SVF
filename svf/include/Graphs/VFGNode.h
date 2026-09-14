@@ -128,45 +128,45 @@ class StmtVFGNode : public VFGNode
 {
 
 private:
-    const PAGEdge* pagEdge;
+    const SVFStmt* svfStmt;
 
 public:
     /// Constructor
-    StmtVFGNode(NodeID id, const PAGEdge* e, VFGNodeK k): VFGNode(id,k), pagEdge(e)
+    StmtVFGNode(NodeID id, const SVFStmt* e, VFGNodeK k): VFGNode(id,k), svfStmt(e)
     {
     }
 
-    /// Whether this node is used for pointer analysis. Both src and dst PAGNodes are of ptr type.
+    /// Whether this node is used for pointer analysis. Both src and dst SVFVars are of ptr type.
     inline bool isPTANode() const
     {
-        return pagEdge->isPTAEdge();
+        return svfStmt->isPTAEdge();
     }
 
-    /// PAGNode and PAGEdge
+    /// SVFVar and SVFStmt
     ///@{
-    inline const PAGEdge* getPAGEdge() const
+    inline const SVFStmt* getSVFStmt() const
     {
-        return pagEdge;
+        return svfStmt;
     }
 
-    inline NodeID getPAGSrcNodeID() const
+    inline NodeID getSrcNodeID() const
     {
-        return pagEdge->getSrcID();
+        return svfStmt->getSrcID();
     }
 
-    inline NodeID getPAGDstNodeID() const
+    inline NodeID getDstNodeID() const
     {
-        return pagEdge->getDstID();
+        return svfStmt->getDstID();
     }
 
-    inline PAGNode* getPAGSrcNode() const
+    inline SVFVar* getSrcNode() const
     {
-        return pagEdge->getSrcNode();
+        return svfStmt->getSrcNode();
     }
 
-    inline PAGNode* getPAGDstNode() const
+    inline SVFVar* getDstNode() const
     {
-        return pagEdge->getDstNode();
+        return svfStmt->getDstNode();
     }
     //@}
 
@@ -209,6 +209,22 @@ public:
     LoadVFGNode(NodeID id, const LoadStmt* edge): StmtVFGNode(id, edge,Load)
     {
 
+    }
+    inline const ValVar* getSrcNode() const
+    {
+        return SVFUtil::cast<ValVar>(StmtVFGNode::getSrcNode());
+    }
+    inline const ValVar* getDstNode() const
+    {
+        return SVFUtil::cast<ValVar>(StmtVFGNode::getDstNode());
+    }
+    inline const ValVar* getRHSVar() const
+    {
+        return getSrcNode();
+    }
+    inline const ValVar* getLHSVar() const
+    {
+        return getDstNode();
     }
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
     //@{
@@ -255,6 +271,22 @@ public:
     {
 
     }
+    inline const ValVar* getSrcNode() const
+    {
+        return SVFUtil::cast<ValVar>(StmtVFGNode::getSrcNode());
+    }
+    inline const ValVar* getDstNode() const
+    {
+        return SVFUtil::cast<ValVar>(StmtVFGNode::getDstNode());
+    }
+    inline const ValVar* getRHSVar() const
+    {
+        return getSrcNode();
+    }
+    inline const ValVar* getLHSVar() const
+    {
+        return getDstNode();
+    }
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
     //@{
     static inline bool classof(const StoreVFGNode *)
@@ -300,6 +332,22 @@ public:
     {
 
     }
+    inline const ValVar* getSrcNode() const
+    {
+        return SVFUtil::cast<ValVar>(StmtVFGNode::getSrcNode());
+    }
+    inline const ValVar* getDstNode() const
+    {
+        return SVFUtil::cast<ValVar>(StmtVFGNode::getDstNode());
+    }
+    inline const ValVar* getRHSVar() const
+    {
+        return getSrcNode();
+    }
+    inline const ValVar* getLHSVar() const
+    {
+        return getDstNode();
+    }
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
     //@{
     static inline bool classof(const CopyVFGNode *)
@@ -337,9 +385,9 @@ public:
 class CmpVFGNode: public VFGNode
 {
 public:
-    typedef Map<u32_t,const PAGNode*> OPVers;
+    typedef Map<u32_t,const ValVar*> OPVers;
 protected:
-    const PAGNode* res;
+    const ValVar* res;
     OPVers opVers;
 
 private:
@@ -349,7 +397,7 @@ private:
 
 public:
     /// Constructor
-    CmpVFGNode(NodeID id,const PAGNode* r): VFGNode(id,Cmp), res(r) { }
+    CmpVFGNode(NodeID id,const ValVar* r): VFGNode(id,Cmp), res(r) { }
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
     //@{
     static inline bool classof(const CmpVFGNode *)
@@ -371,17 +419,17 @@ public:
     //@}
     /// Operands at a BinaryNode
     //@{
-    inline const PAGNode* getOpVer(u32_t pos) const
+    inline const ValVar* getOpVer(u32_t pos) const
     {
         OPVers::const_iterator it = opVers.find(pos);
         assert(it!=opVers.end() && "version is nullptr, did not rename?");
         return it->second;
     }
-    inline void setOpVer(u32_t pos, const PAGNode* node)
+    inline void setOpVer(u32_t pos, const ValVar* node)
     {
         opVers[pos] = node;
     }
-    inline const PAGNode* getRes() const
+    inline const ValVar* getRes() const
     {
         return res;
     }
@@ -414,9 +462,9 @@ public:
 class BinaryOPVFGNode: public VFGNode
 {
 public:
-    typedef Map<u32_t,const PAGNode*> OPVers;
+    typedef Map<u32_t,const ValVar*> OPVers;
 protected:
-    const PAGNode* res;
+    const ValVar* res;
     OPVers opVers;
 
 private:
@@ -426,7 +474,7 @@ private:
 
 public:
     /// Constructor
-    BinaryOPVFGNode(NodeID id,const PAGNode* r): VFGNode(id,BinaryOp), res(r) { }
+    BinaryOPVFGNode(NodeID id,const ValVar* r): VFGNode(id,BinaryOp), res(r) { }
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
     //@{
     static inline bool classof(const BinaryOPVFGNode *)
@@ -448,17 +496,17 @@ public:
     //@}
     /// Operands at a BinaryNode
     //@{
-    inline const PAGNode* getOpVer(u32_t pos) const
+    inline const ValVar* getOpVer(u32_t pos) const
     {
         OPVers::const_iterator it = opVers.find(pos);
         assert(it!=opVers.end() && "version is nullptr, did not rename?");
         return it->second;
     }
-    inline void setOpVer(u32_t pos, const PAGNode* node)
+    inline void setOpVer(u32_t pos, const ValVar* node)
     {
         opVers[pos] = node;
     }
-    inline const PAGNode* getRes() const
+    inline const ValVar* getRes() const
     {
         return res;
     }
@@ -488,9 +536,9 @@ public:
 class UnaryOPVFGNode: public VFGNode
 {
 public:
-    typedef Map<u32_t,const PAGNode*> OPVers;
+    typedef Map<u32_t,const ValVar*> OPVers;
 protected:
-    const PAGNode* res;
+    const ValVar* res;
     OPVers opVers;
 
 private:
@@ -500,7 +548,7 @@ private:
 
 public:
     /// Constructor
-    UnaryOPVFGNode(NodeID id, const PAGNode *r) : VFGNode(id, UnaryOp), res(r) { }
+    UnaryOPVFGNode(NodeID id, const ValVar *r) : VFGNode(id, UnaryOp), res(r) { }
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
     //@{
     static inline bool classof(const UnaryOPVFGNode *)
@@ -522,21 +570,21 @@ public:
     //@}
     /// Operands at a UnaryNode
     //@{
-    inline const PAGNode* getOpVer(u32_t pos) const
+    inline const ValVar* getOpVer(u32_t pos) const
     {
         OPVers::const_iterator it = opVers.find(pos);
         assert(it!=opVers.end() && "version is nullptr, did not rename?");
         return it->second;
     }
-    inline void setOpVer(u32_t pos, const PAGNode* node)
+    inline void setOpVer(u32_t pos, const ValVar* node)
     {
         opVers[pos] = node;
     }
-    inline const PAGNode* getRes() const
+    inline const ValVar* getRes() const
     {
         return res;
     }
-    inline const PAGNode* getOpVar() const
+    inline const ValVar* getOpVar() const
     {
         assert(getOpVerNum()==1 && "UnaryNode can only have one operand!");
         return getOpVer(0);
@@ -635,6 +683,22 @@ public:
     {
 
     }
+    inline const ValVar* getSrcNode() const
+    {
+        return SVFUtil::cast<ValVar>(StmtVFGNode::getSrcNode());
+    }
+    inline const ValVar* getDstNode() const
+    {
+        return SVFUtil::cast<ValVar>(StmtVFGNode::getDstNode());
+    }
+    inline const ValVar* getRHSVar() const
+    {
+        return getSrcNode();
+    }
+    inline const ValVar* getLHSVar() const
+    {
+        return getDstNode();
+    }
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
     //@{
     static inline bool classof(const GepVFGNode *)
@@ -671,14 +735,14 @@ class PHIVFGNode : public VFGNode
 {
 
 public:
-    typedef Map<u32_t,const PAGNode*> OPVers;
+    typedef Map<u32_t,const ValVar*> OPVers;
 protected:
-    const PAGNode* res;
+    const ValVar* res;
     OPVers opVers;
 
 public:
     /// Constructor
-    PHIVFGNode(NodeID id, const PAGNode* r,VFGNodeK k = TPhi);
+    PHIVFGNode(NodeID id, const ValVar* r,VFGNodeK k = TPhi);
 
     /// Whether this phi node is of pointer type (used for pointer analysis).
     inline bool isPTANode() const
@@ -688,17 +752,17 @@ public:
 
     /// Operands at a llvm PHINode
     //@{
-    inline const PAGNode* getOpVer(u32_t pos) const
+    inline const ValVar* getOpVer(u32_t pos) const
     {
         OPVers::const_iterator it = opVers.find(pos);
         assert(it!=opVers.end() && "version is nullptr, did not rename?");
         return it->second;
     }
-    inline void setOpVer(u32_t pos, const PAGNode* node)
+    inline void setOpVer(u32_t pos, const ValVar* node)
     {
         opVers[pos] = node;
     }
-    inline const PAGNode* getRes() const
+    inline const ValVar* getRes() const
     {
         return res;
     }
@@ -756,7 +820,7 @@ private:
     OPIncomingBBs opIncomingBBs;
 public:
     /// Constructor
-    IntraPHIVFGNode(NodeID id, const PAGNode* r): PHIVFGNode(id, r, TIntraPhi)
+    IntraPHIVFGNode(NodeID id, const ValVar* r): PHIVFGNode(id, r, TIntraPhi)
     {
     }
 
@@ -766,7 +830,7 @@ public:
         assert(it!=opIncomingBBs.end() && "version is nullptr, did not rename?");
         return it->second;
     }
-    inline void setOpVerAndBB(u32_t pos, const PAGNode* node, const ICFGNode* bb)
+    inline void setOpVerAndBB(u32_t pos, const ValVar* node, const ICFGNode* bb)
     {
         opVers[pos] = node;
         opIncomingBBs[pos] = bb;
@@ -813,6 +877,22 @@ public:
     {
 
     }
+    inline const ObjVar* getSrcNode() const
+    {
+        return SVFUtil::cast<ObjVar>(StmtVFGNode::getSrcNode());
+    }
+    inline const ValVar* getDstNode() const
+    {
+        return SVFUtil::cast<ValVar>(StmtVFGNode::getDstNode());
+    }
+    inline const ValVar* getLHSVar() const
+    {
+        return getDstNode();
+    }
+    inline const ObjVar* getRHSVar() const
+    {
+        return getSrcNode();
+    }
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
     //@{
     static inline bool classof(const AddrVFGNode *)
@@ -847,11 +927,11 @@ class ArgumentVFGNode : public VFGNode
 {
 
 protected:
-    const PAGNode* param;
+    const ValVar* param;
 
 public:
     /// Constructor
-    ArgumentVFGNode(NodeID id, const PAGNode* p, VFGNodeK k): VFGNode(id,k), param(p)
+    ArgumentVFGNode(NodeID id, const ValVar* p, VFGNodeK k): VFGNode(id,k), param(p)
     {
     }
 
@@ -894,7 +974,7 @@ private:
     const CallICFGNode* cs;
 public:
     /// Constructor
-    ActualParmVFGNode(NodeID id, const PAGNode* n, const CallICFGNode* c) :
+    ActualParmVFGNode(NodeID id, const ValVar* n, const CallICFGNode* c) :
         ArgumentVFGNode(id, n, AParm), cs(c)
     {
     }
@@ -906,7 +986,7 @@ public:
     }
 
     /// Return parameter
-    inline const PAGNode* getParam() const
+    inline const ValVar* getParam() const
     {
         return param;
     }
@@ -948,17 +1028,17 @@ class FormalParmVFGNode : public ArgumentVFGNode
 {
 private:
     const FunObjVar* fun;
-    CallPESet callPEs;
+    const CallPE* callPE;
 
 public:
     /// Constructor
-    FormalParmVFGNode(NodeID id, const PAGNode* n, const FunObjVar* f):
-        ArgumentVFGNode(id, n, FParm),  fun(f)
+    FormalParmVFGNode(NodeID id, const ValVar* n, const FunObjVar* f):
+        ArgumentVFGNode(id, n, FParm),  fun(f), callPE(nullptr)
     {
     }
 
     /// Return parameter
-    inline const PAGNode* getParam() const
+    inline const ValVar* getParam() const
     {
         return param;
     }
@@ -968,20 +1048,15 @@ public:
     {
         return fun;
     }
-    /// Return call edge
-    inline void addCallPE(const CallPE* call)
+    /// Set the (single, phi-like) CallPE for this formal parameter
+    inline void setCallPE(const CallPE* call)
     {
-        callPEs.insert(call);
+        callPE = call;
     }
-    /// Call edge iterator
-    ///@{
-    inline CallPESet::const_iterator callPEBegin() const
+    /// Return the CallPE (phi-like, merges all actual params)
+    inline const CallPE* getCallPE() const
     {
-        return callPEs.begin();
-    }
-    inline CallPESet::const_iterator callPEEnd() const
-    {
-        return callPEs.end();
+        return callPE;
     }
     //@}
 
@@ -1028,7 +1103,7 @@ private:
 
 public:
     /// Constructor
-    ActualRetVFGNode(NodeID id, const PAGNode* n, const CallICFGNode* c) :
+    ActualRetVFGNode(NodeID id, const ValVar* n, const CallICFGNode* c) :
         ArgumentVFGNode(id, n, ARet), cs(c)
     {
     }
@@ -1043,7 +1118,7 @@ public:
         return cs->getCaller();
     }
     /// Receive parameter at callsite
-    inline const PAGNode* getRev() const
+    inline const ValVar* getRev() const
     {
         return param;
     }
@@ -1091,10 +1166,10 @@ private:
 
 public:
     /// Constructor
-    FormalRetVFGNode(NodeID id, const PAGNode* n, const FunObjVar* f);
+    FormalRetVFGNode(NodeID id, const ValVar* n, const FunObjVar* f);
 
     /// Return value at callee
-    inline const PAGNode* getRet() const
+    inline const ValVar* getRet() const
     {
         return param;
     }
@@ -1219,10 +1294,10 @@ private:
 class NullPtrVFGNode : public VFGNode
 {
 private:
-    const PAGNode* node;
+    const SVFVar* node;
 public:
     /// Constructor
-    NullPtrVFGNode(NodeID id, const PAGNode* n) : VFGNode(id,NPtr), node(n)
+    NullPtrVFGNode(NodeID id, const SVFVar* n) : VFGNode(id,NPtr), node(n)
     {
 
     }
@@ -1231,8 +1306,8 @@ public:
     {
         return node->isPointer();
     }
-    /// Return corresponding PAGNode
-    const PAGNode* getPAGNode() const
+    /// Return corresponding SVFVar
+    const SVFVar* getSVFVar() const
     {
         return node;
     }

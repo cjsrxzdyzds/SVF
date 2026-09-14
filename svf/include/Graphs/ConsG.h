@@ -69,7 +69,7 @@ protected:
 
     void clearSolitaries();  // remove nodes that are neither pointers nor connected with any edge
 
-    SVFStmt::SVFStmtSetTy& getPAGEdgeSet(SVFStmt::PEDGEK kind)
+    SVFStmt::SVFStmtSetTy& getSVFStmtSet(SVFStmt::PEDGEK kind)
     {
         return pag->getPTASVFStmtSet(kind);
     }
@@ -312,9 +312,9 @@ public:
     {
         return pag->getAllFieldsObjVars(id);
     }
-    inline NodeID getBaseObjVar(NodeID id)
+    inline NodeID getBaseObjVarID(NodeID id)
     {
-        return pag->getBaseObjVar(id);
+        return pag->getBaseObjVarID(id);
     }
     inline bool isSingleFieldObj(NodeID id) const
     {

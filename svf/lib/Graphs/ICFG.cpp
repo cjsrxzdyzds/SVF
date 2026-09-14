@@ -27,14 +27,15 @@
  *      Author: Yulei Sui
  */
 
-#include "Graphs/ICFG.h"
 #include "Graphs/CallGraph.h"
-#include "SVFIR/SVFIR.h"
-#include <Util/Options.h>
+#include "Graphs/GraphPrinter.h"
+#include "Graphs/ICFG.h"
+#include "Util/Options.h"
 
 using namespace SVF;
 using namespace SVFUtil;
 
+class SVFIR;
 
 FunEntryICFGNode::FunEntryICFGNode(NodeID id, const FunObjVar* f) : InterICFGNode(id, FunEntryBlock)
 {
@@ -43,17 +44,6 @@ FunEntryICFGNode::FunEntryICFGNode(NodeID id, const FunObjVar* f) : InterICFGNod
     if (f->begin() != f->end())
     {
         bb = f->getEntryBlock();
-    }
-}
-
-FunExitICFGNode::FunExitICFGNode(NodeID id, const FunObjVar* f)
-    : InterICFGNode(id, FunExitBlock), formalRet(nullptr)
-{
-    fun = f;
-    // if function is implemented
-    if (f->begin() != f->end())
-    {
-        bb = f->getExitBB();
     }
 }
 
@@ -235,6 +225,17 @@ ICFG::~ICFG()
         delete it;
     }
     icfgNodeToSVFLoopVec.clear();
+}
+
+void ICFG::addICFGNode(ICFGNode* node)
+{
+    addGNode(node->getId(),node);
+}
+
+void ICFG::addGlobalICFGNode(GlobalICFGNode* globalICFGNode)
+{
+    this->globalBlockNode = globalICFGNode;
+    addICFGNode(globalICFGNode);
 }
 
 
@@ -444,17 +445,7 @@ void ICFG::updateCallGraph(CallGraph* callgraph)
             {
                 FunEntryICFGNode* calleeEntryNode = getFunEntryBlock(callee);
                 FunExitICFGNode* calleeExitNode = getFunExitBlock(callee);
-                if(ICFGEdge* callEdge = addCallEdge(callBlockNode, calleeEntryNode))
-                {
-                    for (const SVFStmt *stmt : callBlockNode->getSVFStmts())
-                    {
-                        if(const CallPE *callPE = SVFUtil::dyn_cast<CallPE>(stmt))
-                        {
-                            if(callPE->getFunEntryICFGNode() == calleeEntryNode)
-                                SVFUtil::cast<CallCFGEdge>(callEdge)->addCallPE(callPE);
-                        }
-                    }
-                }
+                addCallEdge(callBlockNode, calleeEntryNode);
                 if(ICFGEdge* retEdge = addRetEdge(calleeExitNode, retBlockNode))
                 {
                     for (const SVFStmt *stmt : retBlockNode->getSVFStmts())
@@ -526,34 +517,34 @@ struct DOTGraphTraits<ICFG*> : public DOTGraphTraits<SVFIR*>
         std::string str;
         std::stringstream rawstr(str);
 
+        rawstr <<  "shape=record";
+
         if(SVFUtil::isa<IntraICFGNode>(node))
         {
-            rawstr <<  "color=black";
+            rawstr <<  ",color=black";
         }
         else if(SVFUtil::isa<FunEntryICFGNode>(node))
         {
-            rawstr <<  "color=yellow";
+            rawstr <<  ",color=yellow";
         }
         else if(SVFUtil::isa<FunExitICFGNode>(node))
         {
-            rawstr <<  "color=green";
+            rawstr <<  ",color=green";
         }
         else if(SVFUtil::isa<CallICFGNode>(node))
         {
-            rawstr <<  "color=red";
+            rawstr <<  ",color=red";
         }
         else if(SVFUtil::isa<RetICFGNode>(node))
         {
-            rawstr <<  "color=blue";
+            rawstr <<  ",color=blue";
         }
         else if(SVFUtil::isa<GlobalICFGNode>(node))
         {
-            rawstr <<  "color=purple";
+            rawstr <<  ",color=purple";
         }
         else
             assert(false && "no such kind of node!!");
-
-        rawstr <<  "";
 
         return rawstr.str();
     }

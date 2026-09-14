@@ -28,11 +28,13 @@
  *      Author: Yulei Sui
  */
 
+#include <functional>
+#include <sstream>
+
 #include "Graphs/CallGraph.h"
-#include "SVFIR/SVFIR.h"
+#include "Graphs/GraphPrinter.h"
 #include "Util/Options.h"
 #include "Util/SVFUtil.h"
-#include <sstream>
 
 using namespace SVF;
 using namespace SVFUtil;
@@ -159,6 +161,13 @@ CallGraph::CallGraph(const CallGraph& other)
 
 }
 
+CallSiteID CallGraph::addCallSite(const CallICFGNode* cs, const FunObjVar* callee, const CallSiteID csid, std::pair<const CallICFGNode*, const FunObjVar*> newCS)
+{
+    csToIdMap.insert(std::make_pair(newCS, csid));
+    idToCSMap.insert(std::make_pair(csid, newCS));
+    return csid;
+}
+
 /*!
  *  Memory has been cleaned up at GenericGraph
  */
@@ -174,8 +183,13 @@ CallGraphEdge* CallGraph::hasGraphEdge(CallGraphNode* src,
                                        CallGraphEdge::CEDGEK kind, CallSiteID csId) const
 {
     CallGraphEdge edge(src,dst,kind,csId);
-    CallGraphEdge* outEdge = src->hasOutgoingEdge(&edge);
-    CallGraphEdge* inEdge = dst->hasIncomingEdge(&edge);
+    return hasGraphEdge(&edge);
+}
+
+CallGraphEdge* CallGraph::hasGraphEdge(CallGraphEdge* cgEdge) const
+{
+    CallGraphEdge* outEdge = cgEdge->getSrcNode()->hasOutgoingEdge(cgEdge);
+    CallGraphEdge* inEdge = cgEdge->getDstNode()->hasIncomingEdge(cgEdge);
     if (outEdge && inEdge)
     {
         assert(outEdge == inEdge && "edges not match");
@@ -359,8 +373,13 @@ void CallGraph::addCallGraphNode(const FunObjVar* fun)
 {
     NodeID id  = callGraphNodeNum;
     CallGraphNode*callGraphNode = new CallGraphNode(id, fun);
-    addGNode(id, callGraphNode);
-    funToCallGraphNodeMap[callGraphNode->getFunction()] = callGraphNode;
+    addCallGraphNode(callGraphNode);
+}
+
+void CallGraph::addCallGraphNode(CallGraphNode* cgNode)
+{
+    addGNode(cgNode->getId(), cgNode);
+    funToCallGraphNodeMap[cgNode->getFunction()] = cgNode;
     callGraphNodeNum++;
 }
 
@@ -388,9 +407,14 @@ void CallGraph::addDirectCallGraphEdge(const CallICFGNode* cs,const FunObjVar* c
     {
         CallGraphEdge* edge = new CallGraphEdge(caller,callee, CallGraphEdge::CallRetEdge, csId);
         edge->addDirectCallSite(cs);
-        addEdge(edge);
+        addDirectCallGraphEdge(edge);
         callinstToCallGraphEdgesMap[cs].insert(edge);
     }
+}
+
+void CallGraph::addDirectCallGraphEdge(CallGraphEdge* cgEdge)
+{
+    addEdge(cgEdge);
 }
 
 namespace SVF
@@ -426,7 +450,7 @@ struct DOTGraphTraits<CallGraph*> : public DefaultDOTGraphTraits
         const FunObjVar* fun = node->getFunction();
         if (!SVFUtil::isExtCall(fun))
         {
-            return "shape=box";
+            return "shape=record";
         }
         else
             return "shape=Mrecord";

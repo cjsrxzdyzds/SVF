@@ -45,7 +45,7 @@ void FlowDDA::computeDDAPts(NodeID id)
     resetQuery();
     LocDPItem::setMaxBudget(Options::FlowBudget());
 
-    PAGNode* node = getPAG()->getGNode(id);
+    const ValVar* node = getPAG()->getValVar(id);
     LocDPItem dpm = getDPIm(node->getId(),getDefSVFGNode(node));
 
     /// start DDA analysis
@@ -148,7 +148,7 @@ PointsTo FlowDDA::processGepPts(const GepSVFGNode* gep, const PointsTo& srcPts)
             tmpDstPts.set(ptd);
         else
         {
-            const GepStmt* gepStmt = SVFUtil::cast<GepStmt>(gep->getPAGEdge());
+            const GepStmt* gepStmt = SVFUtil::cast<GepStmt>(gep->getSVFStmt());
             if (gepStmt->isVariantFieldGep())
             {
                 setObjFieldInsensitive(ptd);

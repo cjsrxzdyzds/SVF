@@ -32,13 +32,12 @@
 #ifndef INCLUDE_SVFIR_SVFVALUE_H_
 #define INCLUDE_SVFIR_SVFVALUE_H_
 
-#include "SVFIR/SVFType.h"
-#include "Graphs/GraphPrinter.h"
-
+#include "Util/GeneralType.h"
 
 namespace SVF
 {
 
+class SVFType;
 
 class SVFValue
 {
@@ -71,7 +70,6 @@ public:
         RetValNode,              // ├── Represents a return value node
         VarargValNode,           // ├── Represents a variadic argument node
         GlobalValNode,           // ├── Represents a global variable node
-        ConstAggValNode,         // ├── Represents a constant aggregate value node
         // │   └─ Subclass: ConstDataValVar
         ConstDataValNode,        // │   ├── Represents a constant data variable
         BlackHoleValNode,        // │   ├── Represents a black hole node
@@ -80,6 +78,8 @@ public:
         ConstNullptrValNode,     // │   └── Represents a constant nullptr value node
         // │   └─ Subclass: DummyValVar
         DummyValNode,            // │   └── Dummy node for uninitialized values
+        IntrinsicValNode,        // │   └── LLVM intrinsic call instruction (e.g. llvm.dbg.declare)
+        AsmPCValNode,            // │   └── InlineAsm, DSOLocalEquivalent, NoCFIValue
 
         // └─ Subclass: ObjVar (Object variable nodes)
         ObjNode,                 // ├── Represents an object variable
@@ -91,7 +91,6 @@ public:
         HeapObjNode,             // │   ├── Represents a heap object
         StackObjNode,            // │   ├── Represents a stack object
         GlobalObjNode,           // │   ├── Represents a global object
-        ConstAggObjNode,         // │   ├── Represents a constant aggregate object
         // │   └─ Subclass: ConstDataObjVar
         ConstDataObjNode,        // │   ├── Represents a constant data object
         ConstFPObjNode,          // │   ├── Represents a constant floating-point object
@@ -145,7 +144,6 @@ public:
         CHNodeKd,         // Class hierarchy graph node
         ConstraintNodeKd, // Constraint graph node
         TCTNodeKd,        // Thread creation tree node
-        DCHNodeKd,        // DCHG node
         BasicBlockKd,     // Basic block node
         OtherKd           // Other node kind
     };
@@ -199,6 +197,7 @@ public:
     }
 
     const std::string valueOnlyToString() const;
+    const bool hasLLVMValue() const;
 
 
 protected:
@@ -238,10 +237,10 @@ protected:
 
     static inline bool isValVarKinds(GNodeK n)
     {
-        static_assert(DummyValNode - ValNode == 13,
+        static_assert(AsmPCValNode - ValNode == 14,
                       "The number of ValVarKinds has changed, make sure the "
                       "range is correct");
-        return n <= DummyValNode && n >= ValNode;
+        return n <= AsmPCValNode && n >= ValNode;
     }
 
 
@@ -255,7 +254,7 @@ protected:
 
     static inline bool isObjVarKinds(GNodeK n)
     {
-        static_assert(DummyObjNode - ObjNode == 12,
+        static_assert(DummyObjNode - ObjNode == 11,
                       "The number of ObjVarKinds has changed, make sure the "
                       "range is correct");
         return n <= DummyObjNode && n >= ObjNode;
@@ -263,7 +262,7 @@ protected:
 
     static inline bool isBaseObjVarKinds(GNodeK n)
     {
-        static_assert(DummyObjNode - BaseObjNode == 10,
+        static_assert(DummyObjNode - BaseObjNode == 9,
                       "The number of BaseObjVarKinds has changed, make sure the "
                       "range is correct");
         return n <= DummyObjNode && n >= BaseObjNode;

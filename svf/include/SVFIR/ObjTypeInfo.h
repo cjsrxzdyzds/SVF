@@ -30,11 +30,12 @@
 #ifndef INCLUDE_SVFIR_OBJTYPEINFO_H_
 #define INCLUDE_SVFIR_OBJTYPEINFO_H_
 
+#include "Util/GeneralType.h"
 
-#include "Util/SVFUtil.h"
-#include "MemoryModel/AccessPath.h"
 namespace SVF
 {
+
+class SVFType;
 
 /*!
  * Type Info of an abstract memory object
@@ -42,6 +43,7 @@ namespace SVF
 class ObjTypeInfo
 {
     friend class SymbolTableBuilder;
+    friend class GraphDBClient;
 
 public:
     typedef enum
@@ -147,6 +149,10 @@ public:
     inline void setFlag(MEMTYPE mask)
     {
         flags |= mask;
+    }
+    inline u32_t getFlag() const
+    {
+        return flags;
     }
     inline bool hasFlag(MEMTYPE mask)
     {

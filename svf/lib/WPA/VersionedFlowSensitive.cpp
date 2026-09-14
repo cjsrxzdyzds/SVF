@@ -7,14 +7,17 @@
  *      Author: Mohamad Barbar
  */
 
-#include "WPA/Andersen.h"
-#include "WPA/VersionedFlowSensitive.h"
-#include "Util/Options.h"
-#include "MemoryModel/PointsTo.h"
 #include <iostream>
 #include <queue>
 #include <thread>
 #include <mutex>
+
+#include "WPA/Andersen.h"
+#include "WPA/VersionedFlowSensitive.h"
+#include "WPA/WPAStat.h"
+#include "MemoryModel/PTATY.h"
+#include "MemoryModel/PointsTo.h"
+#include "Util/Options.h"
 
 using namespace SVF;
 
@@ -82,7 +85,7 @@ void VersionedFlowSensitive::prelabel(void)
         {
             // l: *p = q.
             // If p points to o (Andersen's), l yields a new version for o.
-            NodeID p = stn->getPAGDstNodeID();
+            NodeID p = stn->getDstNodeID();
             for (NodeID o : ander->getPts(p))
             {
                 prelabeledObjects.insert(o);
@@ -141,7 +144,7 @@ void VersionedFlowSensitive::meldLabel(void)
         const PointsTo *nPts = nullptr;
         if (const StoreSVFGNode *store = SVFUtil::dyn_cast<StoreSVFGNode>(sn))
         {
-            const NodeID p = store->getPAGDstNodeID();
+            const NodeID p = store->getDstNodeID();
             nPts = &(this->ander->getPts(p));
         }
 
@@ -652,12 +655,12 @@ bool VersionedFlowSensitive::processLoad(const LoadSVFGNode* load)
 
     // l: p = *q
     NodeID l = load->getId();
-    NodeID p = load->getPAGDstNodeID();
-    NodeID q = load->getPAGSrcNodeID();
+    NodeID p = load->getDstNodeID();
+    NodeID q = load->getSrcNodeID();
 
     const PointsTo& qpt = getPts(q);
     // p = *q, the type of p must be a pointer
-    if (load->getPAGDstNode()->isPointer())
+    if (load->getDstNode()->isPointer())
     {
         for (NodeID o : qpt)
         {
@@ -692,12 +695,12 @@ bool VersionedFlowSensitive::processLoad(const LoadSVFGNode* load)
 
 bool VersionedFlowSensitive::processStore(const StoreSVFGNode* store)
 {
-    NodeID p = store->getPAGDstNodeID();
+    NodeID p = store->getDstNodeID();
     const PointsTo &ppt = getPts(p);
 
     if (ppt.empty()) return false;
 
-    NodeID q = store->getPAGSrcNodeID();
+    NodeID q = store->getSrcNodeID();
     const PointsTo &qpt = getPts(q);
 
     NodeID l = store->getId();
@@ -711,7 +714,7 @@ bool VersionedFlowSensitive::processStore(const StoreSVFGNode* store)
     if (!qpt.empty())
     {
         // *p = q, the type of q must be a pointer
-        if (store->getPAGSrcNode()->isPointer())
+        if (store->getSrcNode()->isPointer())
         {
             for (NodeID o : ppt)
             {
@@ -791,7 +794,9 @@ void VersionedFlowSensitive::cluster(void)
     }
 
     PointsTo::MappingPtr nodeMapping =
-        std::make_shared<std::vector<NodeID>>(NodeIDAllocator::Clusterer::cluster(ander, keys, candidateMappings, "aux-ander"));
+        std::make_shared<std::vector<NodeID>>(
+            NodeIDAllocator::Clusterer::cluster(ander, keys, candidateMappings, "aux-ander", print_stat)
+        );
     PointsTo::MappingPtr reverseNodeMapping =
         std::make_shared<std::vector<NodeID>>(NodeIDAllocator::Clusterer::getReverseNodeMapping(*nodeMapping));
 

@@ -22,3 +22,8 @@ const std::string SVFBasicBlock::toString() const
     rawstr << "\n----------------------------------------\n";
     return rawstr.str();
 }
+
+void BasicBlockGraph::addBasicBlock(SVFBasicBlock* bb)
+{
+    addGNode(bb->getId(), bb);
+}

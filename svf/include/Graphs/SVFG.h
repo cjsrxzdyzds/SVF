@@ -74,7 +74,7 @@ class SVFG : public VFG
 
 public:
     typedef VFGNodeIDToNodeMapTy SVFGNodeIDToNodeMapTy;
-    typedef Map<const PAGNode*, NodeID> PAGNodeToDefMapTy;
+    typedef Map<const ValVar*, NodeID> ValVarToDefMapTy;
     typedef Map<const MRVer*, NodeID> MSSAVarToDefMapTy;
     typedef NodeBS ActualINSVFGNodeSet;
     typedef NodeBS ActualOUTSVFGNodeSet;
@@ -167,17 +167,33 @@ public:
     /// Connect SVFG nodes between caller and callee for indirect call site
     virtual void connectCallerAndCallee(const CallICFGNode* cs, const FunObjVar* callee, SVFGEdgeSetTy& edges);
 
-    /// Given a pagNode, return its definition site
-    inline const SVFGNode* getDefSVFGNode(const PAGNode* pagNode) const
+    /// Given a valVar, return its definition site
+    inline const SVFGNode* getDefSVFGNode(const ValVar* valVar) const
     {
-        return getSVFGNode(getDef(pagNode));
+        return getSVFGNode(getDef(valVar));
     }
 
-    /// Given a pagNode, return whether it has definition site
-    inline bool hasDefSVFGNode(const PAGNode* pagNode) const
+    /// Given a valVar, return whether it has definition site
+    inline bool hasDefSVFGNode(const ValVar* valVar) const
     {
-        return hasDef(pagNode) && hasSVFGNode(getDef(pagNode));
+        return hasDef(valVar) && hasSVFGNode(getDef(valVar));
     }
+
+    /// Given a ValVar and its SVFGNode, find the definition-site SVFGNode
+    /// by following incoming direct VFGEdges (asserts unique definition)
+    const SVFGNode* getDefSiteOfValVar(const ValVar* var) const;
+
+    /// Given an ObjVar and its use-site SVFGNode, find the definition-site ICFGNode
+    /// by following incoming IndirectSVFGEdges whose pts contains the ObjVar (asserts unique definition)
+    const Set<const SVFGNode*> getDefSiteOfObjVar(const ObjVar* obj, const SVFGNode* node) const;
+
+    /// Given a ValVar, find all use-site SVFGNodes
+    /// by following outgoing direct VFGEdges from its unique definition SVFGNode
+    const Set<const SVFGNode*> getUseSitesOfValVar(const ValVar* var) const;
+
+    /// Given an ObjVar and its def-site SVFGNodes, find all use-site SVFGNodes
+    /// by following outgoing IndirectSVFGEdges whose pts contains the ObjVar
+    const Set<const SVFGNode*> getUseSitesOfObjVar(const ObjVar* obj, const SVFGNode* node) const;
 
     /// Perform statistics
     void performStat();
@@ -307,7 +323,7 @@ protected:
 
     /// Get inter value flow edges between indirect call site and callee.
     //@{
-    virtual inline void getInterVFEdgeAtIndCSFromAPToFP(const PAGNode* cs_arg, const PAGNode* fun_arg, const CallICFGNode*, CallSiteID csId, SVFGEdgeSetTy& edges)
+    virtual inline void getInterVFEdgeAtIndCSFromAPToFP(const ValVar* cs_arg, const ValVar* fun_arg, const CallICFGNode*, CallSiteID csId, SVFGEdgeSetTy& edges)
     {
         SVFGNode* actualParam = getSVFGNode(getDef(cs_arg));
         SVFGNode* formalParam = getSVFGNode(getDef(fun_arg));
@@ -316,7 +332,7 @@ protected:
         edges.insert(edge);
     }
 
-    virtual inline void getInterVFEdgeAtIndCSFromFRToAR(const PAGNode* fun_ret, const PAGNode* cs_ret, CallSiteID csId, SVFGEdgeSetTy& edges)
+    virtual inline void getInterVFEdgeAtIndCSFromFRToAR(const ValVar* fun_ret, const ValVar* cs_ret, CallSiteID csId, SVFGEdgeSetTy& edges)
     {
         SVFGNode* formalRet = getSVFGNode(getDef(fun_ret));
         SVFGNode* actualRet = getSVFGNode(getDef(cs_ret));
@@ -347,19 +363,19 @@ protected:
     //@}
 
 
-    /// Given a PAGNode, set/get its def SVFG node (definition of top level pointers)
+    /// Given a ValVar, set/get its def SVFG node (definition of top level pointers)
     //@{
-    inline void setDef(const PAGNode* pagNode, const SVFGNode* node)
+    inline void setDef(const ValVar* valVar, const SVFGNode* node)
     {
-        VFG::setDef(pagNode, node);
+        VFG::setDef(valVar, node);
     }
-    inline NodeID getDef(const PAGNode* pagNode) const
+    inline NodeID getDef(const ValVar* valVar) const
     {
-        return VFG::getDef(pagNode);
+        return VFG::getDef(valVar);
     }
-    inline bool hasDef(const PAGNode* pagNode) const
+    inline bool hasDef(const ValVar* valVar) const
     {
-        return VFG::hasDef(pagNode);
+        return VFG::hasDef(valVar);
     }
     //@}
 
@@ -484,6 +500,20 @@ namespace SVF
 template<> struct GenericGraphTraits<SVF::SVFG*> : public GenericGraphTraits<SVF::GenericGraph<SVF::SVFGNode,SVF::SVFGEdge>* >
 {
     typedef SVF::SVFGNode *NodeRef;
+    static constexpr bool isFilteredGraph = false;
+
+    /// Whether n belongs to this graph (the whole SVFG contains every node).
+    /// Mirrored by GenericGraphTraits<const SlicedSVFGView*>, so a solver
+    /// templated on the graph type restricts itself to the graph's nodes.
+    static bool containsNode(SVF::SVFG*, const SVF::SVFGNode*)
+    {
+        return true;
+    }
+
+    static bool containsEdge(SVF::SVFG*, const SVF::SVFGEdge*)
+    {
+        return true;
+    }
 };
 
 } // End namespace llvm

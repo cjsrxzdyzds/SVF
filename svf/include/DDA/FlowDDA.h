@@ -38,8 +38,9 @@
 #define FlowDDA_H_
 
 #include "MemoryModel/PointerAnalysisImpl.h"
-#include "Util/DPItem.h"
 #include "DDA/DDAVFSolver.h"
+#include "Util/DPItem.h"
+#include "Util/GeneralType.h"
 
 namespace SVF
 {
@@ -58,7 +59,7 @@ public:
     typedef BVDataPTAImpl::CallEdgeMap	CallEdgeMap;
     typedef BVDataPTAImpl::FunctionSet	FunctionSet;
     /// Constructor
-    FlowDDA(SVFIR* _pag, DDAClient* client): BVDataPTAImpl(_pag, PointerAnalysis::FlowS_DDA),
+    FlowDDA(SVFIR* _pag, DDAClient* client): BVDataPTAImpl(_pag, PTATY::FlowS_DDA),
         DDAVFSolver<NodeID,PointsTo,LocDPItem>(),
         _client(client)
     {
@@ -118,7 +119,7 @@ public:
     /// Handle Address SVFGNode to add proper points-to
     virtual inline void handleAddr(PointsTo& pts,const LocDPItem& dpm,const AddrSVFGNode* addr) override
     {
-        NodeID srcID = addr->getPAGSrcNodeID();
+        NodeID srcID = addr->getSrcNodeID();
         /// whether this object is set field-insensitive during pre-analysis
         if (isFieldInsensitive(srcID))
             srcID = getFIObjVar(srcID);

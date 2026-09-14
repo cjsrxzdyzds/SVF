@@ -54,11 +54,13 @@ void DDAClient::answerQueries(PointerAnalysis* pta)
 
     collectCandidateQueries(pta->getPAG());
 
+    // We tell the compiler count is used as DBOUT ignores the statement on some builds.
     u32_t count = 0;
+    (void)count;
     for (OrderedNodeSet::iterator nIter = candidateQueries.begin();
             nIter != candidateQueries.end(); ++nIter,++count)
     {
-        PAGNode* node = pta->getPAG()->getGNode(*nIter);
+        const SVFVar* node = pta->getPAG()->getSVFVar(*nIter);
         if(pta->getPAG()->isValidTopLevelPtr(node))
         {
             DBOUT(DGENERAL,outs() << "\n@@Computing PointsTo for :" << node->getId() <<

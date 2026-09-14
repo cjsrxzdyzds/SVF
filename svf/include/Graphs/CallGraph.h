@@ -224,6 +224,7 @@ public:
     {
         return node->getNodeKind() == CallNodeKd;
     }
+
     //@}
 };
 
@@ -233,6 +234,8 @@ public:
 typedef GenericGraph<CallGraphNode, CallGraphEdge> GenericPTACallGraphTy;
 class CallGraph : public GenericPTACallGraphTy
 {
+    friend class GraphDBClient;
+
 
 public:
     typedef CallGraphEdge::CallGraphEdgeSet CallGraphEdgeSet;
@@ -281,12 +284,13 @@ protected:
         if(it == csToIdMap.end())
         {
             CallSiteID id = totalCallSiteNum++;
-            csToIdMap.insert(std::make_pair(newCS, id));
-            idToCSMap.insert(std::make_pair(id, newCS));
+            addCallSite(cs,callee,id, newCS);
             return id;
         }
         return it->second;
     }
+
+    CallSiteID addCallSite(const CallICFGNode* cs, const FunObjVar* callee, const CallSiteID csid, std::pair<const CallICFGNode*, const FunObjVar*> newCS);
 
     /// Add call graph edge
     inline void addEdge(CallGraphEdge* edge)
@@ -295,6 +299,14 @@ protected:
         edge->getSrcNode()->addOutgoingEdge(edge);
     }
 
+    /// add direct call graph edge from database [only used this function when loading cgEdges from db results]
+    void addDirectCallGraphEdge(CallGraphEdge* cgEdge);
+
+    /// add call graph node from database [only used this function when loading cgNodes from db results]
+    void addCallGraphNode(CallGraphNode* cgNode);
+
+    /// Whether we have already created this call graph edge
+    CallGraphEdge* hasGraphEdge(CallGraphEdge* cgEdge) const;
 public:
     /// Constructor
     CallGraph(CGEK k = NormCallGraph);
@@ -490,6 +502,55 @@ struct GenericGraphTraits<Inverse<SVF::CallGraphNode*> > : public GenericGraphTr
 template<> struct GenericGraphTraits<SVF::CallGraph*> : public GenericGraphTraits<SVF::GenericGraph<SVF::CallGraphNode,SVF::CallGraphEdge>* >
 {
     typedef SVF::CallGraphNode*NodeRef;
+
+    static const SVF::CallGraphNode* getRawNode(const SVF::CallGraphNode* n)
+    {
+        return n;
+    }
+
+    // Graph-intrinsic queries shared with the sliced-view specialisation
+    // (GenericGraphTraits<const SlicedThreadCallGraphView*>).
+    //@{
+    /// In-edges of n under this graph (whole CallGraph: all of them).
+    static void getInEdges(const SVF::CallGraph*, const SVF::CallGraphNode* n,
+                           std::vector<const SVF::CallGraphEdge*>& out)
+    {
+        out.clear();
+        for (SVF::CallGraphEdge* e : n->getInEdges())
+            out.push_back(e);
+    }
+    static void getOutEdges(const SVF::CallGraph*, const SVF::CallGraphNode* n,
+                            std::vector<const SVF::CallGraphEdge*>& out)
+    {
+        out.clear();
+        for (SVF::CallGraphEdge* e : n->getOutEdges())
+            out.push_back(e);
+    }
+    static void getDirectCalls(const SVF::CallGraph*, const SVF::CallGraphEdge* e,
+                               std::vector<const SVF::CallICFGNode*>& out)
+    {
+        out.assign(e->getDirectCalls().begin(), e->getDirectCalls().end());
+    }
+    static void getIndirectCalls(const SVF::CallGraph*, const SVF::CallGraphEdge* e,
+                                 std::vector<const SVF::CallICFGNode*>& out)
+    {
+        out.assign(e->getIndirectCalls().begin(), e->getIndirectCalls().end());
+    }
+    static bool containsCallSite(const SVF::CallGraph*,
+                                 const SVF::CallGraphEdge* e,
+                                 const SVF::CallICFGNode* callSite)
+    {
+        return e->getDirectCalls().count(callSite) ||
+               e->getIndirectCalls().count(callSite);
+    }
+    static void getCallees(SVF::CallGraph* g,
+                           const SVF::CallICFGNode* callSite,
+                           SVF::CallGraph::FunctionSet& callees)
+    {
+        callees.clear();
+        g->getCallees(callSite, callees);
+    }
+    //@}
 };
 
 } // End namespace llvm

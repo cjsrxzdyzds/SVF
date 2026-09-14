@@ -28,6 +28,7 @@
  */
 
 #include "Util/Options.h"
+#include "MemoryModel/PointerAnalysisImpl.h"
 #include "MSSA/MemPartition.h"
 #include "MSSA/MemSSA.h"
 #include "Graphs/SVFGStat.h"
@@ -45,21 +46,13 @@ double MemSSA::timeOfSSARenaming  = 0;	///< Time for SSA rename
 /*!
  * Constructor
  */
-MemSSA::MemSSA(BVDataPTAImpl* p, bool ptrOnlyMSSA)
+MemSSA::MemSSA(BVDataPTAImpl* p, std::unique_ptr<MRGenerator> mrGenerator)
 {
     pta = p;
-    assert((pta->getAnalysisTy()!=PointerAnalysis::Default_PTA)
+    assert((pta->getAnalysisTy() != PTATY::Default_PTA)
            && "please specify a pointer analysis");
-
-    if (Options::MemPar() == MemPartition::Distinct)
-        mrGen = new DistinctMRG(pta, ptrOnlyMSSA);
-    else if (Options::MemPar() == MemPartition::IntraDisjoint)
-        mrGen = new IntraDisjointMRG(pta, ptrOnlyMSSA);
-    else if (Options::MemPar() == MemPartition::InterDisjoint)
-        mrGen = new InterDisjointMRG(pta, ptrOnlyMSSA);
-    else
-        assert(false && "unrecognised memory partition strategy");
-
+    assert(mrGenerator != nullptr && "builder must supply an MRGenerator");
+    mrGen = std::move(mrGenerator);
 
     stat = new MemSSAStat(this);
 
@@ -147,7 +140,7 @@ void MemSSA::createMUCHI(const FunObjVar& fun)
         {
             if(mrGen->hasSVFStmtList(inst))
             {
-                SVFStmtList& pagEdgeList = mrGen->getPAGEdgesFromInst(inst);
+                SVFStmtList& pagEdgeList = mrGen->getSVFStmtsFromInst(inst);
                 for (SVFStmtList::const_iterator bit = pagEdgeList.begin(),
                         ebit = pagEdgeList.end(); bit != ebit; ++bit)
                 {
@@ -284,7 +277,7 @@ void MemSSA::SSARenameBB(const SVFBasicBlock& bb)
     {
         if(mrGen->hasSVFStmtList(pNode))
         {
-            SVFStmtList& pagEdgeList = mrGen->getPAGEdgesFromInst(pNode);
+            SVFStmtList& pagEdgeList = mrGen->getSVFStmtsFromInst(pNode);
             for(SVFStmtList::const_iterator bit = pagEdgeList.begin(), ebit= pagEdgeList.end();
                     bit!=ebit; ++bit)
             {
@@ -437,8 +430,7 @@ void MemSSA::destroy()
         }
     }
 
-    delete mrGen;
-    mrGen = nullptr;
+    mrGen.reset();
     delete stat;
     stat = nullptr;
     pta = nullptr;
@@ -644,7 +636,7 @@ void MemSSA::dumpMSSA(OutStream& Out)
                 else
                 {
                     bool dump_preamble = false;
-                    SVFStmtList& pagEdgeList = mrGen->getPAGEdgesFromInst(inst);
+                    SVFStmtList& pagEdgeList = mrGen->getSVFStmtsFromInst(inst);
                     for(SVFStmtList::const_iterator bit = pagEdgeList.begin(), ebit= pagEdgeList.end();
                             bit!=ebit; ++bit)
                     {

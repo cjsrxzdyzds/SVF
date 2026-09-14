@@ -28,11 +28,13 @@
 
 #include "AE/Core/AbstractState.h"
 #include "Graphs/SVFG.h"
+#include "MSSA/SVFGBuilder.h"
 #include "SVF-LLVM/LLVMUtil.h"
 #include "SVF-LLVM/SVFIRBuilder.h"
 #include "Util/CommandLine.h"
 #include "Util/Options.h"
 #include "WPA/Andersen.h"
+#include <llvm/Support/ManagedStatic.h>
 
 using namespace llvm;
 using namespace std;
@@ -102,7 +104,7 @@ void dummyVisit(const VFGNode* node)
 /*!
  * An example to query/collect all the uses of a definition of a value along value-flow graph (VFG)
  */
-void traverseOnVFG(const SVFG* vfg, const SVFVar* svfval)
+void traverseOnVFG(const SVFG* vfg, const ValVar* svfval)
 {
     if (!vfg->hasDefSVFGNode(svfval))
         return;
@@ -179,7 +181,10 @@ int main(int argc, char ** argv)
             const SVFGNode* node = it.second;
             if (node->getValue())
             {
-                traverseOnVFG(svfg, node->getValue());
+                if (const ValVar* valVar = SVFUtil::dyn_cast<ValVar>(node->getValue()))
+                {
+                    traverseOnVFG(svfg, valVar);
+                }
                 /// Print points-to information
                 printPts(ander, node->getValue());
                 for (const SVFGEdge* edge : node->getOutEdges())
@@ -209,7 +214,8 @@ int main(int argc, char ** argv)
 
     LLVMModuleSet::getLLVMModuleSet()->dumpModulesToFile(".svf.bc");
     SVF::LLVMModuleSet::releaseLLVMModuleSet();
+#if LLVM_VERSION_MAJOR < 21
     llvm::llvm_shutdown();
+#endif
     return 0;
 }
-

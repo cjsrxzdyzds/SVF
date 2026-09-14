@@ -30,15 +30,19 @@
 #ifndef SABERSVFGBUILDER_H_
 #define SABERSVFGBUILDER_H_
 
+#include "Graphs/SVFG.h"
 #include "MSSA/SVFGBuilder.h"
-#include "SVFIR/SVFValue.h"
+#include "Util/GeneralType.h"
 #include "Util/WorkList.h"
 
 
 namespace SVF
 {
 
+class BVDataPTAImpl;
+class CallICFGNode;
 class SaberCondAllocator;
+class ValVar;
 
 class SaberSVFGBuilder : public SVFGBuilder
 {
@@ -60,9 +64,9 @@ public:
     }
 
     /// Add ActualParmVFGNode
-    inline void addActualParmVFGNode(const PAGNode* pagNode, const CallICFGNode* cs)
+    inline void addActualParmVFGNode(const ValVar* svfVar, const CallICFGNode* cs)
     {
-        svfg->addActualParmVFGNode(pagNode, cs);
+        svfg->addActualParmVFGNode(svfVar, cs);
     }
 
     void setSaberCondAllocator(SaberCondAllocator* allocator)
@@ -96,8 +100,8 @@ protected:
     /// obj and obj' are both considered global memory
     void collectGlobals(BVDataPTAImpl* pta);
 
-    /// Whether points-to of a PAGNode points-to global variable
-    bool accessGlobal(BVDataPTAImpl* pta,const PAGNode* pagNode);
+    /// Whether points-to of a SVFVar points-to global variable
+    bool accessGlobal(BVDataPTAImpl* pta,const SVFVar* svfVar);
 
     /// Collect objects along points-to chains
     PointsTo& CollectPtsChain(BVDataPTAImpl* pta,NodeID id, NodeToPTSSMap& cachedPtsMap);
