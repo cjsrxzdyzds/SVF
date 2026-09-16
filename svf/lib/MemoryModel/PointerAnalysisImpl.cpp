@@ -96,10 +96,7 @@ BVDataPTAImpl::~BVDataPTAImpl() = default;
 
 void BVDataPTAImpl::finalize()
 {
-    // BUGFIX: Only run normalization for offline tools (built from file).
-    // In-process LTO (built from memory) has transient node states that cause crashes during cleanup.
-    if (pag->isBuiltFromFile())
-        normalizePointsTo();
+    normalizePointsTo();
     
     // Print statistics (required by CI tests)
     PointerAnalysis::finalize();
