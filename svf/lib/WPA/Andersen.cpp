@@ -563,7 +563,11 @@ bool Andersen::processLoad(NodeID node, const ConstraintEdge* load)
     ///       make gcc in spec 2000 pass the flow-sensitive analysis.
     ///       Try to handle black hole obj in an appropriate way.
 //	if (pag->isBlkObjOrConstantObj(node))
-    if (pag->isConstantObj(node) || pag->getSVFVar(load->getDstID())->isPointer() == false)
+    // Under -admit-i2p-copy an int-typed load may read a pointer punned into
+    // integer memory, so the pointer-type guard must not drop it.
+    if (pag->isConstantObj(node) ||
+        (!Options::AdmitI2PCopy() &&
+         pag->getSVFVar(load->getDstID())->isPointer() == false))
         return false;
 
     numOfProcessedLoad++;
@@ -583,7 +587,12 @@ bool Andersen::processStore(NodeID node, const ConstraintEdge* store)
     ///       make gcc in spec 2000 pass the flow-sensitive analysis.
     ///       Try to handle black hole obj in an appropriate way
 //	if (pag->isBlkObjOrConstantObj(node))
-    if (pag->isConstantObj(node) || pag->getSVFVar(store->getSrcID())->isPointer() == false)
+    // Under -admit-i2p-copy the stored value may be a ptrtoint-punned pointer
+    // (e.g. SwissTable ctrl written as i64), so the pointer-type guard must
+    // not drop it.
+    if (pag->isConstantObj(node) ||
+        (!Options::AdmitI2PCopy() &&
+         pag->getSVFVar(store->getSrcID())->isPointer() == false))
         return false;
 
     numOfProcessedStore++;

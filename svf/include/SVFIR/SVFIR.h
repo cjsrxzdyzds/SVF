@@ -102,6 +102,14 @@ private:
     CallSiteSet callSiteSet; /// all the callsites of a program
     CallGraph* callGraph; /// Callgraph with direct calls only; no change allowed after init and use callgraph in PointerAnalysis for indirect calls)
 
+    // UNSAFE-SVF BEGIN (-model-extractvalue)
+    // Cross-function aggregate-field copies (callee ret-chain leaf ->
+    // extractvalue result) that have no legal PAG representation (only one
+    // RetPE is allowed per return CFG edge); consumed by
+    // ConstraintGraph::buildCG as plain copy edges.
+    std::vector<std::pair<NodeID, NodeID>> extraAggCopyPairs;
+    // UNSAFE-SVF END
+
     static std::unique_ptr<SVFIR> pag;	///< Singleton pattern here to enable instance of SVFIR can only be created once.
     static std::string pagReadFromTxt;
 
@@ -198,6 +206,19 @@ public:
         return IDToNodeMap;
     }
     //@}
+
+    // UNSAFE-SVF BEGIN (-model-extractvalue)
+    inline void addExtraAggCopyPair(NodeID src, NodeID dst)
+    {
+        extraAggCopyPairs.emplace_back(src, dst);
+    }
+    inline const std::vector<std::pair<NodeID, NodeID>>&
+    getExtraAggCopyPairs() const
+    {
+        return extraAggCopyPairs;
+    }
+    // UNSAFE-SVF END
+
     /// Return memToFieldsMap
     inline MemObjToFieldsMap& getMemToFieldsMap()
     {
