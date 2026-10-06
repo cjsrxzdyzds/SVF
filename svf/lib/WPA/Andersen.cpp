@@ -111,7 +111,12 @@ void AndersenBase::solveConstraints()
     // Start solving constraints
     DBOUT(DGENERAL, outs() << SVFUtil::pasMsg("Start Solving Constraints\n"));
 
-    bool limitTimerSet = SVFUtil::startAnalysisLimitTimer(Options::AnderTimeLimit());
+    bool timeLimited = Options::AnderTimeLimit() > 0;
+    if (timeLimited)
+    {
+        assert(Options::FsTimeLimit() == 0 && "both -ander-time-limit and -fs-time-limit set.");
+        SVFUtil::startAnalysisLimitTimer(Options::AnderTimeLimit());
+    }
 
     initWorklist();
     do
@@ -131,7 +136,10 @@ void AndersenBase::solveConstraints()
     while (reanalyze);
 
     // Analysis is finished, reset the alarm if we set it.
-    SVFUtil::stopAnalysisLimitTimer(limitTimerSet);
+    if (timeLimited)
+    {
+        SVFUtil::stopAnalysisLimitTimer();
+    }
 
     DBOUT(DGENERAL, outs() << SVFUtil::pasMsg("Finish Solving Constraints\n"));
 }
@@ -697,7 +705,7 @@ bool Andersen::processGepPts(const PointsTo& pts, const GepCGEdge* edge)
 /**
  * Detect and collapse PWC nodes produced by processing gep edges, under the constraint of field limit.
  */
-inline void Andersen::collapsePWCNode(NodeID nodeId)
+void Andersen::collapsePWCNode(NodeID nodeId)
 {
     // If a node is a PWC node, collapse all its points-to target.
     // collapseNodePts() may change the points-to set of the nodes which have been processed
@@ -706,7 +714,7 @@ inline void Andersen::collapsePWCNode(NodeID nodeId)
         reanalyze = true;
 }
 
-inline void Andersen::collapseFields()
+void Andersen::collapseFields()
 {
     while (consCG->hasNodesToBeCollapsed())
     {
