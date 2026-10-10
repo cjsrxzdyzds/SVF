@@ -1331,6 +1331,7 @@ void SVFIRBuilder::visitReturnInst(ReturnInst &inst)
 }
 
 
+/// Shared traversal for local extracts and aggregate return fields.
 /// Find scalar sources and call results for one aggregate field. Discovery keeps
 /// walking after an unsupported source so other call dependencies are still found.
 using AggregateCallSource = std::pair<const CallInst*, std::vector<unsigned>>;
