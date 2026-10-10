@@ -216,6 +216,7 @@ public:
     /// Reset data
     inline void resetData()
     {
+        mayAliasesByPts.clear();
         AveragePointsToSetSize = 0;
         MaxPointsToSetSize = 0;
         timeOfProcessCopyGep = 0;
@@ -268,6 +269,8 @@ public:
 protected:
 
     CallSite2DummyValPN callsite2DummyValPN;        ///< Map an instruction to a dummy obj which created at an indirect callsite, which invokes a heap allocator
+    /// getMayAliases answers, keyed by the query's points-to set, which is all an answer depends on
+    Map<PointsTo, NodeBS> mayAliasesByPts;
 
     /// Handle diff points-to set.
     virtual inline void computeDiffPts(NodeID id)
@@ -362,6 +365,8 @@ protected:
     /// Answer a may-alias query from the reverse points-to sets. Returns nullopt
     /// when those sets cannot answer it, leaving the caller to try every node.
     std::optional<NodeBS> collectMayAliasesFromIndex(const PointsTo& expandedPts);
+    /// Every SVFIR node that may alias a node with this points-to set
+    NodeBS collectMayAliases(const PointsTo& pts);
 
     /// Also check getMayAliases on the pointers that the alias tests use
     virtual void validateSuccessTests(std::string fun);

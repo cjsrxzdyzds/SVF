@@ -451,6 +451,7 @@ void Andersen::initialize()
  */
 void Andersen::finalize()
 {
+    mayAliasesByPts.clear();
     // TODO: broken
     if (Options::ClusterAnder())
     {
@@ -937,10 +938,22 @@ void Andersen::updateNodeRepAndSubs(NodeID nodeId, NodeID newRepId)
  */
 NodeBS Andersen::getMayAliases(NodeID node)
 {
+    // The answer depends only on the node's points-to set, and many nodes share
+    // one set: every member of a cycle, and every pointer loaded from the
+    // objects the cycle points to. Compute each set's answer once.
+    const PointsTo& pts = getPts(node);
+    auto cached = mayAliasesByPts.find(pts);
+    if (cached != mayAliasesByPts.end())
+        return cached->second;
+    return mayAliasesByPts.emplace(pts, collectMayAliases(pts)).first->second;
+}
+
+NodeBS Andersen::collectMayAliases(const PointsTo& pts)
+{
     // Reuse this expansion for the index lookup and, when necessary, every
     // comparison in the exhaustive fallback.
     PointsTo expandedPts;
-    expandFIObjs(getPts(node), expandedPts);
+    expandFIObjs(pts, expandedPts);
     if (auto aliases = collectMayAliasesFromIndex(expandedPts))
         return std::move(*aliases);
 
